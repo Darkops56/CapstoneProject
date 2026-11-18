@@ -1,0 +1,287 @@
+{
+  "name": "Pipeline Mensual Zonaprop Inferencia y Persistencia Drive",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 3 1 * *"
+            }
+          ]
+        }
+      },
+      "id": "e0672a5c-0f10-41ee-9505-7adaacc8be9a",
+      "name": "Cron Mensual (Día 1 03:00)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/memo23~zonaprop-scraper/runs?waitForFinish=300",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"maxItems\": 5,\n  \"startUrls\": [\n    {\n      \"url\": \"https://www.zonaprop.com.ar/departamentos-alquiler-capital-federal.html\"\n    }\n  ]\n}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "9c183ad6-fda8-41e3-af77-3aafb3a21c81",
+      "name": "Apify: Scraper Zonaprop (1000 items)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        304
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "vnUeNbHvvtxDiCq1",
+          "name": "Apify Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// @ts-nocheck\n// Circuit Breaker & Idempotence Check\nconst inputJson = $input.first().json;\nconst runData = inputJson['data'] || {};\nconst datasetId = runData['defaultDatasetId'];\nconst runStatus = runData['status'] || '';\n\n// En cuentas gratuitas de Apify chargedEventCounts puede venir en 0 porque no se cobra por item.\n// Verificamos que el scraper haya finalizado en SUCCEEDED y que exista el datasetId.\nconst charged = runData['chargedEventCounts'] || runData['accountedChargedEventCounts'] || {};\nconst chargedCount = Number(charged['apify-default-dataset-item'] || 0);\nconst isBatchValid = (runStatus === 'SUCCEEDED' && Boolean(datasetId));\n\nif (!isBatchValid) {\n  return [{\n    json: {\n      proceed: false,\n      reason: 'ERR_SCRAPER_INCOMPLETE_BATCH',\n      message: `Scraper finalizó con estado '${runStatus}' sin dataset válido. Abortando para proteger datos.`\n    }\n  }];\n}\n\n// Idempotencia contra $getWorkflowStaticData()\nconst staticData = $getWorkflowStaticData('global');\nconst prevDatasetId = staticData.lastDatasetId;\n\nif (prevDatasetId && prevDatasetId === datasetId) {\n  return [{\n    json: {\n      proceed: false,\n      reason: 'SKIP_IDENTICAL_DATASET',\n      message: 'Dataset idéntico al procesado previamente. Sin cambios.'\n    }\n  }];\n}\n\nstaticData.lastDatasetId = datasetId;\n\nreturn [{\n  json: {\n    proceed: true,\n    datasetId: datasetId,\n    itemCount: chargedCount > 0 ? chargedCount : 5\n  }\n}];"
+      },
+      "id": "a1180224-69e7-4d7d-b0e6-f78eb3472bad",
+      "name": "Circuit Breaker & Hash Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c40324e6-d0bb-49ea-8b17-6d9b6aa09fc8",
+              "leftValue": "={{ $json.proceed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f5de66d1-d451-47a7-a223-60810cb792ce",
+      "name": "¿Proceder a Inferencia?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        656,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/lukita7956~zonaprop-curator-inference/runs?waitForFinish=120",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"datasetId\": \"{{ $json.datasetId }}\",\n  \"limit\": 5\n}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "id": "f49cc7a8-3853-48d5-a4ab-ee5b3dbc7dc5",
+      "name": "Apify: Actor Curado & Inferencia",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        224
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "vnUeNbHvvtxDiCq1",
+          "name": "Apify Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.apify.com/v2/datasets/{{ $json.data.defaultDatasetId }}/items?format=csv&clean=true",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "c18b36b5-16a3-41b6-bdae-e6349cd29523",
+      "name": "Descargar CSV Enriquecido",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1104,
+        224
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "vnUeNbHvvtxDiCq1",
+          "name": "Apify Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "=alquileres_caba_enriquecido_{{ $now.format('yyyy_MM') }}.csv",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "10bpShYlE_FSzUtW3xNz5jH0BGbRGF4yo",
+          "mode": "list",
+          "cachedResultName": "01_mensual_enriquecido",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/10bpShYlE_FSzUtW3xNz5jH0BGbRGF4yo"
+        },
+        "options": {}
+      },
+      "id": "119d95bd-63f8-497b-951f-ef55b9acd7ca",
+      "name": "Google Drive: Guardar CSV Mensual",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1328,
+        224
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "riizvhW8kOx9iE8X",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "console.log('Ejecución omitida por Circuit Breaker:', $json.reason, $json.message);\nreturn [{ json: { status: 'SKIPPED', details: $json } }];"
+      },
+      "id": "e5d75da7-80e0-46c5-8412-f01aa83db75d",
+      "name": "Log: Abortado por Circuit Breaker",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        432
+      ]
+    }
+  ],
+  "connections": {
+    "Cron Mensual (Día 1 03:00)": {
+      "main": [
+        [
+          {
+            "node": "Apify: Scraper Zonaprop (1000 items)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify: Scraper Zonaprop (1000 items)": {
+      "main": [
+        [
+          {
+            "node": "Circuit Breaker & Hash Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Circuit Breaker & Hash Check": {
+      "main": [
+        [
+          {
+            "node": "¿Proceder a Inferencia?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Proceder a Inferencia?": {
+      "main": [
+        [
+          {
+            "node": "Apify: Actor Curado & Inferencia",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log: Abortado por Circuit Breaker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify: Actor Curado & Inferencia": {
+      "main": [
+        [
+          {
+            "node": "Descargar CSV Enriquecido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Descargar CSV Enriquecido": {
+      "main": [
+        [
+          {
+            "node": "Google Drive: Guardar CSV Mensual",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "61031e09-4891-4cc0-92ba-9f31e69ce7bf",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7cb119a4df20522f99346f21768a196c316ffd8451efa7f007981688cc4db00e"
+  },
+  "tags": []
+}

@@ -1,0 +1,9 @@
+{
+  "actorSpecification": 1,
+  "name": "zonaprop-curator-inference",
+  "title": "Zonaprop CABA Curator & Corporate Relocation Inference Engine",
+  "description": "Actor unificado para limpieza tabular, cruce geoespacial con datos GCBA e inferencia con XGBoost y K-Means para scoring de decisión corporativa.",
+  "version": "1.0",
+  "dockerfile": "../Dockerfile",
+  "actorPermissionLevel": "FULL_PERMISSIONS"
+}

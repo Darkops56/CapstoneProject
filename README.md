@@ -29,15 +29,22 @@ El repositorio está estructurado bajo una arquitectura modular desacoplada:
 │
 ├── mlops/                         # 🧠 MLOps: Entrenamiento, Inferencia y Model Registry
 │   ├── train_models.py            # Reentrenamiento periódico (XGBoost + KMeans)
+│   ├── registry.py                # Versionador incremental y guardián de regresión R2 >= 0.80
+│   ├── registry.json              # Registro de versiones de producción y métricas
 │   ├── inference.py               # Script de inferencia por lotes
-│   ├── artifacts/                 # Modelos serializados (.joblib)
+│   ├── artifacts/                 # Modelos serializados (.joblib) versionados (v1, v2...)
 │   ├── figures/                   # Curvas de evaluación y explicabilidad SHAP
 │   └── model_metrics.json         # Métricas de validación del modelo
 │
-├── actor/                         # 🐳 Actor de Producción Apify
-│   ├── Dockerfile                 # Contenedor para ejecución serverless
-│   ├── requirements.txt           # Dependencias de scraping y scoring
-│   └── src/                       # Ingesta, parseo NLP y cálculo de scores de oportunidad
+├── actor/                         # 🐳 Actor de Inferencia Mensual Apify (Liviano)
+│   ├── Dockerfile                 # Contenedor para ejecución mensual de scoring
+│   ├── requirements.txt           # Dependencias mínimas de inferencia
+│   └── src/                       # Ingesta, cruce espacial y predicciones
+│
+├── trainer/                       # 🏋️ Actor de Reentrenamiento Anual Apify (Serverless)
+│   ├── Dockerfile                 # Contenedor con XGBoost, Scikit-Learn y Apify SDK
+│   ├── requirements.txt           # Dependencias de modelado y Google Drive API
+│   └── src/                       # Pipeline de reentrenamiento, validación y backup a Drive
 │
 ├── etl/                           # 🗺️ Ingesta y Curación Geoespacial
 │   ├── etl_pipeline.py            # Cruce espacial con subtes, escuelas, delitos y ruido GCBA

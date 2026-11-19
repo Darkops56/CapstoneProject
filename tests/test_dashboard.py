@@ -183,6 +183,33 @@ def test_map_view_deck_structure():
     assert deck.layers[0].type == "ScatterplotLayer"
 
 
+def test_map_view_formatted_tooltips():
+    """Verify tooltips reference pre-formatted strings rather than Python format specifiers."""
+    sample_df = pd.DataFrame({
+        "listing_id": ["999"],
+        "latitud": [-34.58],
+        "longitud": [-58.42],
+        "costo_total_ars": [1250000.0],
+        "precio_justo_ars": [1100000.0],
+        "pct_sobreprecio": [13.63],
+        "score_familia": [77.5],
+        "score_soltero_ejecutivo": [82.0],
+        "recomendacion_familia": ["RECOMENDADA"],
+        "recomendacion_soltero_ejecutivo": ["ALTAMENTE RECOMENDADA"],
+        "barrio": ["Palermo"],
+        "ambientes": [3],
+        "cocheras": [1],
+        "apto_mascotas": [1],
+    })
+    clean_df, _ = norm.normalize_schema(sample_df)
+    deck = map_view.build_pydeck_chart(clean_df, profile="FAMILIA", color_mode="PRECIO")
+    tooltip_html = (deck._tooltip or {}).get("html", "")
+    assert "{costo_total_fmt}" in tooltip_html
+    assert "{precio_justo_fmt}" in tooltip_html
+    assert "{desvio_fmt}" in tooltip_html
+    assert "{costo_total_ars:,.0f}" not in tooltip_html
+
+
 # -------------------------------------------------------------------------
 # UI Components & Filter Helper Tests
 # -------------------------------------------------------------------------

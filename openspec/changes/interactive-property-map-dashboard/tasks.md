@@ -27,3 +27,11 @@
 - [x] 5.1 Ejecutar suite completa de tests deterministas verificando 100% de aserciones aprobadas con `pytest tests/test_dashboard.py -v`
 - [x] 5.2 Levantar servidor local en background y certificar interacción visual y 0 errores de consola mediante `browser_subagent`
 - [x] 5.3 Generar artefacto obligatorio de cierre `evidence.md` documentando la salida de los tests deterministas, métricas de latencia y evidencia visual
+
+## 6. Fase 5: Refinamientos UX/UI y Contraste (Feedback Visual)
+
+- [x] 6.1 Implementar formateo numérico de variables en `src/map_view.py` y verificar con `pytest tests/test_dashboard.py -k test_map_view_formatted_tooltips -v`
+- [x] 6.2 Adaptar estilos de contraste y compatibilidad Dark Theme en `src/ui_components.py` y verificar con `python3 -m py_compile src/ui_components.py`
+- [x] 6.3 Reemplazar multiselect de condición de precio por 3 checkboxes horizontales en `src/ui_components.py` y verificar lógica con `pytest tests/test_dashboard.py -k test_ui_components -v`
+- [x] 6.4 Implementar contenedor con scroll independiente en panel derecho y reducción de margen superior con CSS en `app.py` y verificar sintaxis con `python3 -m py_compile app.py`
+- [x] 6.5 Ejecutar suite completa y certificar con `pytest tests/test_dashboard.py -v` y verificación en `http://localhost:8501`

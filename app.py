@@ -20,6 +20,32 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# Custom CSS for compact top margin and viewport-friendly layout
+st.markdown(
+    """
+    <style>
+    /* Erradicar el margen superior excesivo de Streamlit */
+    .block-container {
+        padding-top: 1.2rem !important;
+        padding-bottom: 1.0rem !important;
+        padding-left: 2rem !important;
+        padding-right: 2rem !important;
+    }
+    header[data-testid="stHeader"] {
+        background: transparent !important;
+        height: 2rem !important;
+    }
+    /* Estilizar contenedor del mapa */
+    div[data-testid="pydeck-map-container"] {
+        border-radius: 10px;
+        overflow: hidden;
+        border: 1px solid #334155;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 
 @st.cache_data(ttl=900, max_entries=4, show_spinner=False)
 def get_cached_normalized_data():
@@ -57,23 +83,41 @@ def main():
     # 4. Render Sidebar Filters
     sidebar_filters = ui.render_sidebar_filters(clean_df, norm_meta)
 
-    # 5. Preliminary filtering to derive active KPIs
-    # Calculate initial stats for top header
-    all_median_price = float(clean_df["costo_total_ars"].median())
-    all_opps = float((clean_df["price_status_key"] == "BAJO_PRECIO").mean() * 100.0)
+    # 5. Fast Preliminary Filter for Dynamic KPIs
+    # Read selection state keys for top controls if present
+    profile_val = st.session_state.get("profile_select", "FAMILIA")
+    cb_b = st.session_state.get("cb_bajo", True)
+    cb_j = st.session_state.get("cb_justo", True)
+    cb_s = st.session_state.get("cb_sobre", True)
+    active_statuses = []
+    if cb_b:
+        active_statuses.append("BAJO_PRECIO")
+    if cb_j:
+        active_statuses.append("PRECIO_JUSTO")
+    if cb_s:
+        active_statuses.append("SOBREPRECIO")
 
-    # Top Control Bar
+    prelim_filters = {
+        **sidebar_filters,
+        "selected_price_statuses": active_statuses,
+    }
+    df_prelim = ui.apply_filters(clean_df, prelim_filters)
+    active_count = len(df_prelim)
+    active_median = float(df_prelim["costo_total_ars"].median()) if not df_prelim.empty else float("nan")
+    active_opps = float((df_prelim["price_status_key"] == "BAJO_PRECIO").mean() * 100.0) if not df_prelim.empty else 0.0
+
+    # Top Control Bar with dynamic KPIs
     top_controls = ui.render_header_and_controls(
-        total_count=len(clean_df),
-        median_price=all_median_price,
-        pct_opportunities=all_opps,
+        total_count=active_count,
+        median_price=active_median,
+        pct_opportunities=active_opps,
         source_meta=source_meta,
     )
 
     # Merge top controls and sidebar filters
     combined_filters = {**sidebar_filters, **top_controls}
 
-    # 6. Multi-Feature Filtering
+    # 6. Final Filtered DataFrame
     df_filtered = ui.apply_filters(clean_df, combined_filters)
 
     # 7. State Check: Empty State
@@ -81,29 +125,29 @@ def main():
         ui.render_empty_state()
         return
 
-    # 8. Split-Screen Body Layout: Map (62%) | Detail / Cards (38%)
-    col_map, col_details = st.columns([62, 38], gap="medium")
+    # 8. Split-Screen Body Layout: Map (60%) | Detail / Cards (40%)
+    col_map, col_details = st.columns([60, 40], gap="medium")
 
     with col_map:
-        st.markdown("##### Vista Satelital y Distribución CABA")
+        st.markdown("<div style='font-size: 14px; font-weight: 600; margin-bottom: 6px;'>Vista Cartográfica CABA</div>", unsafe_allow_html=True)
 
-        # Map Legend
+        # High-Contrast Map Legend (Compatible with Dark & Light Themes)
         color_mode = top_controls["color_mode"]
         if color_mode == "PRECIO":
             legend_html = """
-            <div data-testid="map-legend" style="display: flex; gap: 16px; font-size: 12px; margin-bottom: 8px; background: white; padding: 6px 12px; border-radius: 6px; border: 1px solid #e2e8f0; width: fit-content;">
-                <span><span style="color: #0F766E; font-size: 14px;">●</span> <b>Oportunidad</b> (≤ -5%)</span>
-                <span><span style="color: #D97706; font-size: 14px;">●</span> <b>Precio Justo</b> (-5% a +10%)</span>
-                <span><span style="color: #DC2626; font-size: 14px;">●</span> <b>Sobreprecio</b> (> +10%)</span>
+            <div data-testid="map-legend" style="display: flex; gap: 16px; font-size: 12px; margin-bottom: 8px; background: rgba(15, 23, 42, 0.9); padding: 6px 14px; border-radius: 8px; border: 1px solid #334155; width: fit-content; color: #f8fafc;">
+                <span><span style="color: #0F766E; font-size: 15px;">●</span> <b>Oportunidad</b> (≤ -5%)</span>
+                <span><span style="color: #D97706; font-size: 15px;">●</span> <b>Precio Justo</b> (-5% a +10%)</span>
+                <span><span style="color: #DC2626; font-size: 15px;">●</span> <b>Sobreprecio</b> (> +10%)</span>
             </div>
             """
         else:
             legend_html = """
-            <div data-testid="map-legend" style="display: flex; gap: 16px; font-size: 12px; margin-bottom: 8px; background: white; padding: 6px 12px; border-radius: 6px; border: 1px solid #e2e8f0; width: fit-content;">
-                <span><span style="color: #10B981; font-size: 14px;">●</span> Altamente Recom.</span>
-                <span><span style="color: #3B82F6; font-size: 14px;">●</span> Recomendada</span>
-                <span><span style="color: #EAB308; font-size: 14px;">●</span> Evaluar</span>
-                <span><span style="color: #EF4444; font-size: 14px;">●</span> Descartar</span>
+            <div data-testid="map-legend" style="display: flex; gap: 16px; font-size: 12px; margin-bottom: 8px; background: rgba(15, 23, 42, 0.9); padding: 6px 14px; border-radius: 8px; border: 1px solid #334155; width: fit-content; color: #f8fafc;">
+                <span><span style="color: #10B981; font-size: 15px;">●</span> Altamente Recom.</span>
+                <span><span style="color: #3B82F6; font-size: 15px;">●</span> Recomendada</span>
+                <span><span style="color: #EAB308; font-size: 15px;">●</span> Evaluar</span>
+                <span><span style="color: #EF4444; font-size: 15px;">●</span> Descartar</span>
             </div>
             """
         st.markdown(legend_html, unsafe_allow_html=True)
@@ -115,13 +159,13 @@ def main():
             selected_listing_id=st.session_state["selected_listing_id"],
         )
 
-        # PyDeck WebGL Render container
+        # PyDeck WebGL Render container with fixed 650px height
         st.markdown('<div data-testid="pydeck-map-container">', unsafe_allow_html=True)
         pydeck_event = st.pydeck_chart(
             deck,
             on_select="rerun",
             selection_mode="single-object",
-            use_container_width=True,
+            height=650,
         )
         st.markdown("</div>", unsafe_allow_html=True)
 

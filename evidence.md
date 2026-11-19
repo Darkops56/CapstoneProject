@@ -3,7 +3,7 @@
 **Capacidad:** `interactive-property-map-dashboard`  
 **Rama:** `interactive_property_map_dashboard` (aislada y limpia para deployment directo)  
 **Fecha:** 2026-11-19  
-**Resultado Global:** Aprobado (10/10 tests unitarios y de integración + Verificación E2E autónoma con `browser_subagent`).
+**Resultado Global:** Aprobado (11/11 tests unitarios y de integración + Verificación E2E autónoma con `browser_subagent`).
 
 ---
 
@@ -15,47 +15,39 @@ platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /usr/bin/python3
 cachedir: .pytest_cache
 rootdir: /home/luka/.gemini/antigravity/worktrees/CapstoneProject/interactive_property_map_dashboard
 plugins: anyio-4.16.0, typeguard-4.4.4
-collecting ... collected 10 items
+collecting ... collected 11 items
 
-tests/test_dashboard.py::test_classify_price_status_boundaries PASSED    [ 10%]
-tests/test_dashboard.py::test_normalizer_missing_required_columns PASSED [ 20%]
-tests/test_dashboard.py::test_normalizer_caba_bbox_drop PASSED           [ 30%]
-tests/test_dashboard.py::test_normalizer_drive_schema_aliases PASSED     [ 40%]
-tests/test_dashboard.py::test_normalizer_amenities_graceful_degradation PASSED [ 50%]
-tests/test_dashboard.py::test_data_loader_fallback_when_unconfigured PASSED [ 60%]
-tests/test_dashboard.py::test_data_loader_fallback_on_drive_error PASSED [ 70%]
-tests/test_dashboard.py::test_map_view_deck_structure PASSED             [ 80%]
+tests/test_dashboard.py::test_classify_price_status_boundaries PASSED    [  9%]
+tests/test_dashboard.py::test_normalizer_missing_required_columns PASSED [ 18%]
+tests/test_dashboard.py::test_normalizer_caba_bbox_drop PASSED           [ 27%]
+tests/test_dashboard.py::test_normalizer_drive_schema_aliases PASSED     [ 36%]
+tests/test_dashboard.py::test_normalizer_amenities_graceful_degradation PASSED [ 45%]
+tests/test_dashboard.py::test_data_loader_fallback_when_unconfigured PASSED [ 54%]
+tests/test_dashboard.py::test_data_loader_fallback_on_drive_error PASSED [ 63%]
+tests/test_dashboard.py::test_map_view_deck_structure PASSED             [ 72%]
+tests/test_dashboard.py::test_map_view_formatted_tooltips PASSED         [ 81%]
 tests/test_dashboard.py::test_ui_components_filter_logic PASSED          [ 90%]
 tests/test_dashboard.py::test_filter_performance PASSED                  [100%]
 
-============================== 10 passed in 0.57s ==============================
+============================== 11 passed in 0.58s ==============================
 ```
-
-### Resumen de Aserciones y Cobertura de Requisitos
-1. **Semáforo y Accesibilidad WCAG 2.2**: Validados los cortes estándar `<= -5.0%` (Bajo Precio / `#0F766E`), `-5.0% < x <= 10.0%` (Precio Justo / `#D97706`) y `> 10.0%` (Sobreprecio / `#DC2626`).
-2. **Reconciliación de Alias y Esquemas**: Mapeo determinista de `desvio_precio_pct`, `cluster_habitabilidad`, `score_soltero`, `calificacion_familia` y `calificacion_soltero` al formato canónico sin `NaN` en métricas de decisión.
-3. **Control Geoespacial CABA**: Descarte de coordenadas fuera del bounding box continental de CABA con registro del discriminador `AUDIT_OUT_OF_BOUNDS_DROPPED`.
-4. **Degradación Elegante de Features**: Detección dinámica de flags de amenities (`INFO_FULL_AMENITIES_AVAILABLE` vs. `INFO_GRANULAR_AMENITIES_UNAVAILABLE`) sin lanzar excepciones de clave (`KeyError`).
-5. **Conmutación por Fallo en Ingesta**: Resiliencia probada ante fallos de red de Google Drive con conmutación a `data/fallback_data.csv` y emisión de `WARN_DRIVE_FALLBACK_ACTIVE`.
-6. **Escalabilidad Vectorizada**: Filtrado multi-atributo sobre lote sintético de `10.000` registros ejecutado en **`< 15 ms`** (umbral de tolerancia: `50 ms`).
 
 ---
 
 ## 2. Evidencia de Verificación E2E con Navegador Autónomo (`browser_subagent`)
 
-El subagente de navegador navegó a `http://localhost:8501` y ejecutó la verificación visual y funcional:
+El subagente de navegador verificó los 5 refinamientos en `http://localhost:8501` en viewport de escritorio (`1440x900`):
 
-- **Encabezado y Metadatos**: Título `"Observatorio Inmobiliario CABA | Zonaprop Maps"` cargado; badge de fuente visible con selector semántico `data-testid="data-source-badge"` indicando `"Datos Locales (Offline)"`.
-- **Contenedores Principales**:
-  - `data-testid="pydeck-map-container"`: PyDeck WebGL montado con basemap Carto Positron y canvas GPU activo.
-  - `data-testid="property-cards-panel"`: Listado paginado de 12 tarjetas (`1–12 de 964`) ordenadas por score del perfil activo con badges de semáforo de precios.
-- **Auditoría de Consola**: **0 errores JavaScript y 0 excepciones Python** (`stException` = 0, `stAlert` = 0).
-- **Reactividad de Perfil Dual**: Conmutación de `👨‍👩‍👧 Familia` a `💼 Soltero Ejecutivo` ejecutada exitosamente en la UI, reclasificando y reordenando las tarjetas en milisegundos sin recarga disruptiva.
-
----
-
-## 3. Estado de la Rama para Deployment
-
-La rama `interactive_property_map_dashboard` ha sido aislada y limpiada:
-- **Archivos de Producción en Raíz**: `app.py`, `requirements.txt`, `src/`, `data/fallback_data.csv`, `tests/test_dashboard.py`, `openspec/`.
-- **Artefactos Heredados**: Eliminados de esta rama (preservados en `main`), reduciendo el tamaño del repositorio y garantizando compatibilidad inmediata con Streamlit Community Cloud.
+1. **Scroll Independiente en Panel de Inmuebles (`st.container(height=580)`)**:
+   - `div[data-testid="stVerticalBlock"]` opera con `computedHeight: 580px`, `overflowY: auto`.
+   - Se certificó que el panel de tarjetas scrollea verticalmente sin desplazar la página (`window.scrollY = 0`), manteniendo el mapa y la barra superior fijos en pantalla.
+2. **Margen Superior Compacto**:
+   - Inyección CSS (`padding-top: 1.2rem !important`) redujo el padding a `19.2px`. El encabezado comienza a `35px` del tope del viewport.
+3. **Contraste y Compatibilidad con Dark Theme**:
+   - Tarjetas diseñadas en azul oscuro (`rgb(30, 41, 59)`) con títulos en blanco puro (`rgb(255, 255, 255)`), precios destacados en cyan brillante (`rgb(56, 189, 248)`) y leyendas translúcidas con contraste accesible WCAG 2.2 superior a 4.5:1.
+4. **Formateo Numérico en Tooltips de PyDeck**:
+   - Verificado al pasar el mouse por los puntos del mapa: renderiza valores numéricos reales (`$1,150,000 ARS`, `+0.2%`, `64.1 / 100`) sin exponer sintaxis cruda `{costo_total_ars:,.0f}`.
+5. **Checkboxes de Precio y KPIs Dinámicos**:
+   - Condición de precio implementada con 3 checkboxes (`🟢 Oportunidad`, `🟡 Justo`, `🔴 Sobreprecio`) sin truncamiento de texto.
+   - Los KPIs superiores se actualizan reactivamente al desmarcar/marcar opciones (ej. de 964 a 601 al desmarcar Oportunidad).
+6. **Auditoría de Consola**: **0 errores JavaScript y 0 excepciones Python**.

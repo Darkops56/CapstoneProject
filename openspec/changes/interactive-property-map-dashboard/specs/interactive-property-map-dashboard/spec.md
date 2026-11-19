@@ -95,6 +95,19 @@ El sistema SHALL clasificar cada propiedad según los cortes estándar de sobrep
 - **WHEN** el usuario cambia el perfil activo de `FAMILIA` a `SOLTERO_EJECUTIVO`
 - **THEN** el sistema SHALL actualizar `active_score` a `score_soltero_ejecutivo`, `active_recommendation` a `recomendacion_soltero_ejecutivo`, recalcular el radio de los marcadores en el mapa proporcionalmente a `active_score` (rango `[35, 110]` metros) y reordenar las tarjetas del panel lateral por `active_score` descendente.
 
+#### Scenario: Formateo numérico explícito en tooltips de PyDeck
+- **GIVEN** una propiedad procesada para visualización cartográfica en PyDeck
+- **WHEN** se construye el diccionario de datos para la capa WebGL
+- **THEN** el sistema SHALL preformatear las cadenas de texto (`costo_total_fmt` con separador de miles y símbolo `$`, `precio_justo_fmt`, `desvio_fmt` con signo porcentual explícito y `score_fmt`) y MUST renderizar valores numéricos reales en el tooltip de inspección sin exponer nombres crudos de variables o sintaxis de formato de Python.
+
+#### Scenario: Compatibilidad de contraste WCAG 2.2 y controles de precio en Dark Mode
+- **GIVEN** el dashboard visualizado en tema claro u oscuro (Dark Theme)
+- **WHEN** se renderizan las tarjetas de inmuebles, la leyenda cartográfica y el semáforo de precios
+- **THEN** el sistema SHALL:
+  1. Renderizar la condición de precio como 3 checkboxes independientes y horizontales (`Bajo Precio`, `Precio Justo`, `Sobreprecio`).
+  2. Aplicar contraste cromático superior a 4.5:1 en todos los textos de tarjetas y leyendas tanto en tema oscuro como en tema claro.
+  3. Contener el listado lateral en un contenedor de altura acotada con barra de desplazamiento vertical independiente (`overflow-y: auto`) manteniendo el mapa y la cabecera fijos en pantalla sin desplazamiento global del viewport.
+
 #### Scenario: Conmutación del modo de coloración entre Precio y Recomendación del Perfil
 - **GIVEN** el control `data-testid="color-mode-selector"` con opciones `PRECIO` y `RECOMENDACION`
 - **WHEN** el usuario selecciona `RECOMENDACION`

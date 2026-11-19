@@ -1,5 +1,6 @@
 """UI modular components, KPI cards, property inspector, and 5-state renderers.
-Built with clean typography, progressive disclosure, and WCAG 2.2 accessibility.
+Built with clean typography, progressive disclosure, and WCAG 2.2 accessibility
+compatible with both Light and Dark themes.
 """
 from typing import Dict, Any, List, Optional
 import math
@@ -25,7 +26,7 @@ def apply_filters(df: pd.DataFrame, filters: Dict[str, Any]) -> pd.DataFrame:
 
     # 2. Price Status Semaphore
     selected_statuses = filters.get("selected_price_statuses")
-    if selected_statuses:
+    if selected_statuses is not None:
         mask &= df["price_status_key"].isin(selected_statuses)
 
     # 3. Neighborhoods
@@ -75,13 +76,13 @@ def render_header_and_controls(
     pct_opportunities: float,
     source_meta: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """Renders single-row top bar with profile selector, price semaphores, color mode, and KPIs."""
-    col_title, col_profile, col_color, col_price = st.columns([3, 2, 2, 3], gap="medium")
+    """Renders single-row top bar with profile selector, price checkboxes, color mode, and KPIs."""
+    col_title, col_profile, col_color, col_price = st.columns([2.2, 1.8, 1.8, 4.2], gap="small")
 
     with col_title:
-        st.markdown("### Observatorio CABA")
+        st.markdown("<h3 style='margin: 0; padding: 0;'>Observatorio CABA</h3>", unsafe_allow_html=True)
         source_label = "Google Drive (Actual)" if source_meta.get("reason") == "SOURCE_GDRIVE_LATEST" else "Datos Locales (Offline)"
-        badge_color = "#0F766E" if "GDRIVE" in source_meta.get("reason", "") else "#64748B"
+        badge_color = "#0F766E" if "GDRIVE" in source_meta.get("reason", "") else "#475569"
         st.markdown(
             f'<span data-testid="data-source-badge" style="background-color: {badge_color}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">{source_label}</span>',
             unsafe_allow_html=True,
@@ -104,25 +105,33 @@ def render_header_and_controls(
         )
 
     with col_price:
-        status_opts = ["BAJO_PRECIO", "PRECIO_JUSTO", "SOBREPRECIO"]
-        selected_statuses = st.multiselect(
-            "Condición de Precio",
-            options=status_opts,
-            default=status_opts,
-            format_func=lambda x: "🟢 Oportunidad (≤ -5%)" if x == "BAJO_PRECIO" else ("🟡 Precio Justo" if x == "PRECIO_JUSTO" else "🔴 Sobreprecio (> +10%)"),
-            key="status_multiselect",
-        )
+        st.markdown("<div style='font-size: 14px; font-weight: 500; margin-bottom: 2px;'>Condición de Precio</div>", unsafe_allow_html=True)
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            cb_bajo = st.checkbox("🟢 Oportunidad", value=True, key="cb_bajo")
+        with c2:
+            cb_justo = st.checkbox("🟡 Justo", value=True, key="cb_justo")
+        with c3:
+            cb_sobre = st.checkbox("🔴 Sobreprecio", value=True, key="cb_sobre")
+
+        selected_statuses = []
+        if cb_bajo:
+            selected_statuses.append("BAJO_PRECIO")
+        if cb_justo:
+            selected_statuses.append("PRECIO_JUSTO")
+        if cb_sobre:
+            selected_statuses.append("SOBREPRECIO")
 
     # KPI Strip
     kpi1, kpi2, kpi3 = st.columns(3)
     with kpi1:
         st.metric(label="Propiedades Visibles", value=f"{total_count:,}")
     with kpi2:
-        st.metric(label="Mediana Costo Total", value=f"${median_price:,.0f} ARS")
+        st.metric(label="Mediana Costo Total", value=f"${median_price:,.0f} ARS" if not math.isnan(median_price) else "$0 ARS")
     with kpi3:
         st.metric(label="Oportunidades (Ahorro)", value=f"{pct_opportunities:.1f}%")
 
-    st.markdown("---")
+    st.markdown("<hr style='margin: 8px 0 12px 0; border: none; border-top: 1px solid #334155;'/>", unsafe_allow_html=True)
 
     return {
         "profile": profile,
@@ -193,7 +202,7 @@ def render_sidebar_filters(df: pd.DataFrame, meta: Dict[str, Any]) -> Dict[str, 
 
 
 def render_property_inspector(row: pd.Series, profile: str) -> None:
-    """Renders detailed property inspection view."""
+    """Renders detailed property inspection view with robust dark/light contrast."""
     st.markdown("#### Ficha Detallada de la Propiedad")
 
     score_col = "score_familia" if profile == "FAMILIA" else "score_soltero_ejecutivo"
@@ -208,27 +217,27 @@ def render_property_inspector(row: pd.Series, profile: str) -> None:
 
     st.markdown(
         f"""
-        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; margin-bottom: 16px;">
+        <div style="background-color: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 16px; margin-bottom: 16px; color: #f8fafc;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h3 style="margin: 0; color: #0f172a;">{row.get('barrio', 'Propiedad')}</h3>
-                <span style="background-color: {badge_bg}; color: white; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold;">{status_label} ({desvio:+.1f}%)</span>
+                <h3 style="margin: 0; color: #ffffff; font-size: 18px;">{row.get('barrio', 'Propiedad')}</h3>
+                <span style="background-color: {badge_bg}; color: #ffffff; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold;">{status_label} ({desvio:+.1f}%)</span>
             </div>
-            <p style="margin: 4px 0 12px 0; color: #64748b; font-size: 13px;">ID Publicación: {row.get('listing_id', 'N/A')}</p>
+            <p style="margin: 4px 0 12px 0; color: #94a3b8; font-size: 13px;">ID Publicación: {row.get('listing_id', 'N/A')}</p>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 14px;">
-                <div><b>Costo Total:</b> ${float(row.get('costo_total_ars', 0)):,.0f} ARS</div>
-                <div><b>Precio Justo Teórico:</b> ${float(row.get('precio_justo_ars', 0)):,.0f} ARS</div>
-                <div><b>Ambientes:</b> {int(row.get('ambientes', 1))} amb.</div>
-                <div><b>M2 Totales:</b> {float(row.get('m2_totales', 0)):.0f} m²</div>
-                <div><b>Cocheras:</b> {int(row.get('cocheras', 0))}</div>
-                <div><b>Apto Mascotas:</b> {'Sí 🐾' if row.get('apto_mascotas') == 1 else 'No'}</div>
+                <div><b style="color: #94a3b8;">Costo Total:</b> <span style="color: #38bdf8; font-weight: bold;">${float(row.get('costo_total_ars', 0)):,.0f} ARS</span></div>
+                <div><b style="color: #94a3b8;">Precio Justo:</b> <span style="color: #e2e8f0;">${float(row.get('precio_justo_ars', 0)):,.0f} ARS</span></div>
+                <div><b style="color: #94a3b8;">Ambientes:</b> <span style="color: #e2e8f0;">{int(row.get('ambientes', 1))} amb.</span></div>
+                <div><b style="color: #94a3b8;">M2 Totales:</b> <span style="color: #e2e8f0;">{float(row.get('m2_totales', 0)):.0f} m²</span></div>
+                <div><b style="color: #94a3b8;">Cocheras:</b> <span style="color: #e2e8f0;">{int(row.get('cocheras', 0))}</span></div>
+                <div><b style="color: #94a3b8;">Mascotas:</b> <span style="color: #e2e8f0;">{'Sí 🐾' if row.get('apto_mascotas') == 1 else 'No'}</span></div>
             </div>
-            <hr style="margin: 12px 0; border: none; border-top: 1px solid #e2e8f0;"/>
+            <hr style="margin: 12px 0; border: none; border-top: 1px solid #334155;"/>
             <div style="margin-bottom: 8px;">
-                <b>Score {profile} (0-100):</b> <span style="font-size: 16px; font-weight: bold; color: #0f766e;">{score_val:.1f} / 100</span>
-                <br/><span style="font-size: 12px; color: #475569;">Dictamen: <b>{rec_val}</b></span>
+                <b style="color: #94a3b8;">Score {profile}:</b> <span style="font-size: 16px; font-weight: bold; color: #34d399;">{score_val:.1f} / 100</span>
+                <br/><span style="font-size: 12px; color: #cbd5e1;">Dictamen: <b style="color: #ffffff;">{rec_val}</b></span>
             </div>
-            <div style="font-size: 12px; color: #475569;">
-                <b>Entorno GCBA:</b> Ruido {float(row.get('ruido_db_promedio', 65)):.1f} dBA | Subte {int(row.get('lineas_subte_600m', 0))} líneas | Escuela {float(row.get('distancia_escuela_m', 500)):.0f} m
+            <div style="font-size: 12px; color: #94a3b8;">
+                <b>Entorno GCBA:</b> Ruido {float(row.get('ruido_db_promedio', 65)):.1f} dBA · Subte {int(row.get('lineas_subte_600m', 0))} líneas · Escuela {float(row.get('distancia_escuela_m', 500)):.0f} m
             </div>
         </div>
         """,
@@ -241,7 +250,7 @@ def render_property_inspector(row: pd.Series, profile: str) -> None:
 
 
 def render_property_card(row: pd.Series, profile: str) -> None:
-    """Renders a single compact card in the listing panel."""
+    """Renders a single compact card with high-contrast text and solid styling."""
     score_col = "score_familia" if profile == "FAMILIA" else "score_soltero_ejecutivo"
     rec_col = "recomendacion_familia" if profile == "FAMILIA" else "recomendacion_soltero_ejecutivo"
 
@@ -251,20 +260,21 @@ def render_property_card(row: pd.Series, profile: str) -> None:
     status_label = str(row.get("price_status_label", ""))
     badge_bg = "#0F766E" if desvio <= -5.0 else ("#D97706" if desvio <= 10.0 else "#DC2626")
 
-    col_info, col_action = st.columns([4, 1])
+    col_info, col_action = st.columns([4.2, 0.8])
     with col_info:
         st.markdown(
             f"""
-            <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-bottom: 8px; background: white;">
-                <div style="display: flex; justify-content: space-between;">
-                    <b style="font-size: 14px; color: #0f172a;">{row.get('barrio', 'Propiedad')}</b>
-                    <span style="background: {badge_bg}; color: white; padding: 2px 6px; border-radius: 8px; font-size: 11px;">{status_label}</span>
+            <div style="border: 1px solid #334155; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; background-color: #1e293b; color: #f8fafc;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <b style="font-size: 14px; color: #ffffff;">{row.get('barrio', 'Propiedad')}</b>
+                    <span style="background-color: {badge_bg}; color: #ffffff; padding: 2px 7px; border-radius: 8px; font-size: 11px; font-weight: 600;">{status_label}</span>
                 </div>
-                <div style="font-size: 13px; margin: 4px 0;">
-                    <b>${float(row.get('costo_total_ars', 0)):,.0f} ARS</b> · {int(row.get('ambientes', 1))} amb · {float(row.get('m2_totales', 0)):.0f} m²
+                <div style="font-size: 14px; margin: 5px 0;">
+                    <b style="color: #38bdf8;">${float(row.get('costo_total_ars', 0)):,.0f} ARS</b>
+                    <span style="color: #94a3b8; font-size: 12px;"> · {int(row.get('ambientes', 1))} amb · {float(row.get('m2_totales', 0)):.0f} m²</span>
                 </div>
-                <div style="font-size: 11px; color: #64748b;">
-                    Score: <b>{score_val:.0f}/100</b> ({rec_val}) · {'🐾 Mascotas' if row.get('apto_mascotas')==1 else 'Sin mascotas'} · {'🚗 Cochera' if row.get('cocheras', 0)>=1 else 'Sin cochera'}
+                <div style="font-size: 12px; color: #cbd5e1;">
+                    Score: <b style="color: #34d399;">{score_val:.0f}/100</b> <span style="color: #94a3b8;">({rec_val})</span> · {'🐾 Mascotas' if row.get('apto_mascotas')==1 else 'Sin mascotas'} · {'🚗 Cochera' if row.get('cocheras', 0)>=1 else 'Sin cochera'}
                 </div>
             </div>
             """,
@@ -277,7 +287,7 @@ def render_property_card(row: pd.Series, profile: str) -> None:
 
 
 def render_cards_pagination(df_filtered: pd.DataFrame, profile: str) -> None:
-    """Renders strictly paginated list of cards (12 per page) ordered by score descending."""
+    """Renders strictly paginated list of cards (12 per page) inside an independently scrollable container."""
     if df_filtered.empty:
         return
 
@@ -295,11 +305,13 @@ def render_cards_pagination(df_filtered: pd.DataFrame, profile: str) -> None:
     start_idx = (current_page - 1) * cfg.PAGE_SIZE
     end_idx = min(start_idx + cfg.PAGE_SIZE, total_items)
 
-    st.markdown(f"**Listado de Inmuebles** ({start_idx + 1}–{end_idx} de {total_items})")
+    st.markdown(f"<div style='font-size: 14px; font-weight: 600; margin-bottom: 8px;'>Listado de Inmuebles ({start_idx + 1}–{end_idx} de {total_items})</div>", unsafe_allow_html=True)
 
-    page_items = sorted_df.iloc[start_idx:end_idx]
-    for _, row in page_items.iterrows():
-        render_property_card(row, profile)
+    # Native scrollable container with fixed height so the main page never scrolls
+    with st.container(height=580):
+        page_items = sorted_df.iloc[start_idx:end_idx]
+        for _, row in page_items.iterrows():
+            render_property_card(row, profile)
 
     # Pagination controls
     col_prev, col_num, col_next = st.columns([1, 2, 1])
@@ -309,7 +321,7 @@ def render_cards_pagination(df_filtered: pd.DataFrame, profile: str) -> None:
                 st.session_state["current_page"] = current_page - 1
                 st.rerun()
     with col_num:
-        st.markdown(f"<div style='text-align: center; padding-top: 6px; font-size: 13px;'>Página {current_page} de {total_pages}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='text-align: center; padding-top: 6px; font-size: 13px; color: #94a3b8;'>Página {current_page} de {total_pages}</div>", unsafe_allow_html=True)
     with col_next:
         if current_page < total_pages:
             if st.button("Siguiente ▶", key="btn_next_page"):
@@ -321,10 +333,10 @@ def render_empty_state() -> None:
     """Renders accessible empty state when 0 properties match the filters."""
     st.markdown(
         """
-        <div data-testid="ui-state-empty" style="text-align: center; padding: 40px 20px; background-color: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px; margin: 20px 0;">
+        <div data-testid="ui-state-empty" style="text-align: center; padding: 40px 20px; background-color: #1e293b; border: 2px dashed #475569; border-radius: 12px; margin: 20px 0; color: #f8fafc;">
             <div style="font-size: 40px; margin-bottom: 12px;">🔍</div>
-            <h3 style="color: #1e293b; margin-bottom: 8px;">No se encontraron propiedades</h3>
-            <p style="color: #64748b; font-size: 14px; max-width: 480px; margin: 0 auto 20px auto;">
+            <h3 style="color: #ffffff; margin-bottom: 8px;">No se encontraron propiedades</h3>
+            <p style="color: #94a3b8; font-size: 14px; max-width: 480px; margin: 0 auto 20px auto;">
                 Ninguna propiedad coincide con la combinación de filtros actual (código <code>EMPTY_FILTER_RESULTS</code>). Intente flexibilizar el presupuesto o desactivar filtros de amenities.
             </p>
         </div>

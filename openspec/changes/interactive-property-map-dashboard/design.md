@@ -29,13 +29,17 @@ El sistema debe operar en una rama limpia (`interactive_property_map_dashboard`)
 - **Decisión**:
   1. **Barra Superior de Control (1 fila)**:
      - Selector de Perfil (`FAMILIA` | `SOLTERO_EJECUTIVO`).
-     - Filtro rápido de Semáforo de Precio (`v Bajo Precio <= -5%`, `= Precio Justo -5% a +10%`, `^ Sobreprecio > +10%`).
+     - Filtro rápido de Semáforo de Precio: **3 checkboxes horizontales directos** (`[X] 🟢 Oportunidad (≤ -5%)`, `[X] 🟡 Precio Justo (-5% a +10%)`, `[X] 🔴 Sobreprecio (> +10%)`) reemplazando el multiselect para agilizar la interacción.
      - Selector de modo de coloración (`Colorear por: Precio | Recomendación del Perfil`).
      - 3 KPIs esenciales: `Propiedades Visibles`, `Mediana Costo Total (ARS)` y `% Oportunidades (Bajo Precio)`.
+     - Inyección de CSS compacto (`.block-container { padding-top: 1.5rem !important; }`) para erradicar el margen superior vacío nativo de Streamlit.
   2. **Sidebar Colapsable en 2 Niveles**:
      - *Nivel Primario (visible)*: Rango de presupuesto (`costo_total_ars`), Barrios (`multiselect`), Ambientes mínimos/rango, y checkboxes rápidos de features (`apto_mascotas`, `cocheras >= 1`, más `has_parrilla`, `has_pileta`, `has_gimnasio`, `has_seguridad`, `has_balcon_terraza`, `has_sum_coworking` cuando estén presentes en el dataset).
      - *Nivel Secundario (`st.expander("Filtros de Entorno y Habitabilidad", expanded=False)`)*: `score_amenities` mínimo, `ruido_db_promedio` máximo, `lineas_subte_600m` mínimo, `distancia_escuela_m` máxima y `cluster_label`.
-  3. **Cuerpo Principal Split-Screen (`65% Mapa PyDeck` | `35% Panel Derecho Paginado / Inspector`)**:
+  3. **Cuerpo Principal Split-Screen (`62% Mapa PyDeck` | `38% Panel Derecho Paginado / Inspector`)**:
+     - **Layout Viewport-Locked**: El contenedor de tarjetas (`data-testid="property-cards-panel"`) posee `max-height: 680px; overflow-y: auto;` permitiendo desplazamiento vertical independiente de las propiedades sin scrollear la página completa ni perder la vista del mapa.
+     - **Contraste Accesible Dark/Light Theme**: Tarjetas estilizadas con fondo oscuro refinado (`#1e293b` con borde `#334155`), tipografía blanca contrastada (`#f8fafc`) y precios destacados en cyan (`#38bdf8`), eliminando textos blancos sobre fondo blanco en modo oscuro. Leyenda del mapa con fondo translúcido y texto legible.
+     - **Formateo Precalculado en Tooltips de PyDeck**: Pre-cálculo en DataFrame de `costo_total_fmt`, `precio_justo_fmt`, `desvio_fmt` y `score_fmt` para que el interpolador JS de Deck.gl renderice números exactos sin nombres crudos de variables.
      - Cuando hay una propiedad seleccionada (por clic en el mapa o en una tarjeta), el panel derecho muestra la **Ficha Detallada** (comparativa Costo Publicado vs. Precio Justo XGBoost, barra de Score 0–100 para el perfil activo, métricas de entorno y badges de amenities).
      - Debajo (o en modo lista), se renderizan exactamente **`12` tarjetas por página** ordenadas por `active_score` descendente para evitar saturación visual y DOM bloat.
 

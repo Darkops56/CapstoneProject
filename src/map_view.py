@@ -40,27 +40,27 @@ def build_pydeck_chart(
         bearing=0,
     )
 
-    # Tooltip with HTML markup
+    # Tooltip with HTML markup using pre-formatted fields
     tooltip = {
         "html": """
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; line-height: 1.4; color: #1e293b; padding: 4px;">
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; line-height: 1.4; color: #0f172a; padding: 6px; background-color: #ffffff; border-radius: 8px;">
             <b style="font-size: 14px; color: #0f172a;">{barrio}</b> <span style="color: #64748b;">(ID: {listing_id})</span><br/>
             <hr style="margin: 4px 0; border: none; border-top: 1px solid #e2e8f0;"/>
-            <b>Costo Total:</b> ${costo_total_ars:,.0f} ARS<br/>
-            <b>Precio Justo:</b> ${precio_justo_ars:,.0f} ARS<br/>
-            <b>Desvío:</b> <b>{pct_sobreprecio:+.1f}%</b> ({price_status_label})<br/>
-            <b>Score:</b> {active_score:.1f} / 100 ({active_rec})<br/>
-            <b>Ambientes:</b> {ambientes} amb. | <b>Cocheras:</b> {cocheras}<br/>
-            <b>Mascotas:</b> {mascotas_tag}
+            <b style="color: #334155;">Costo Total:</b> <span style="color: #0f172a; font-weight: 600;">{costo_total_fmt}</span><br/>
+            <b style="color: #334155;">Precio Justo:</b> <span style="color: #0f172a;">{precio_justo_fmt}</span><br/>
+            <b style="color: #334155;">Desvío:</b> <b style="color: #0f172a;">{desvio_fmt}</b> ({price_status_label})<br/>
+            <b style="color: #334155;">Score:</b> <span style="color: #0f766e; font-weight: 600;">{score_fmt}</span> ({active_rec})<br/>
+            <b style="color: #334155;">Ambientes:</b> {ambientes} amb. | <b>Cocheras:</b> {cocheras}<br/>
+            <b style="color: #334155;">Mascotas:</b> {mascotas_tag}
         </div>
         """,
         "style": {
             "backgroundColor": "#ffffff",
-            "color": "#1e293b",
-            "boxShadow": "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+            "color": "#0f172a",
+            "boxShadow": "0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1)",
             "borderRadius": "8px",
             "border": "1px solid #cbd5e1",
-            "padding": "8px 12px",
+            "padding": "4px",
             "zIndex": "1000",
         },
     }
@@ -71,6 +71,12 @@ def build_pydeck_chart(
         plot_df["active_score"] = plot_df["score_familia"] if profile == "FAMILIA" else plot_df["score_soltero_ejecutivo"]
         plot_df["active_rec"] = plot_df["recomendacion_familia"] if profile == "FAMILIA" else plot_df["recomendacion_soltero_ejecutivo"]
         plot_df["mascotas_tag"] = plot_df["apto_mascotas"].apply(lambda x: "Sí (Apto)" if x == 1 else "No apto")
+
+        # Explicitly format numeric fields for pure JS template interpolation in Deck.gl
+        plot_df["costo_total_fmt"] = plot_df["costo_total_ars"].apply(lambda x: f"${x:,.0f} ARS")
+        plot_df["precio_justo_fmt"] = plot_df["precio_justo_ars"].apply(lambda x: f"${x:,.0f} ARS")
+        plot_df["desvio_fmt"] = plot_df["pct_sobreprecio"].apply(lambda x: f"{x:+.1f}%")
+        plot_df["score_fmt"] = plot_df["active_score"].apply(lambda x: f"{x:.1f} / 100")
 
     layer = pdk.Layer(
         "ScatterplotLayer",

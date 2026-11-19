@@ -81,10 +81,10 @@ def render_header_and_controls(
 
     with col_title:
         st.markdown("<h3 style='margin: 0; padding: 0;'>Observatorio CABA</h3>", unsafe_allow_html=True)
-        source_label = "Google Drive (Actual)" if source_meta.get("reason") == "SOURCE_GDRIVE_LATEST" else "Datos Locales (Offline)"
-        badge_color = "#0F766E" if "GDRIVE" in source_meta.get("reason", "") else "#475569"
+        file_desc = source_meta.get("file_name") or "Conectado"
+        source_label = f"☁️ Google Drive ({file_desc})"
         st.markdown(
-            f'<span data-testid="data-source-badge" style="background-color: {badge_color}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">{source_label}</span>',
+            f'<span data-testid="data-source-badge" style="background-color: #0F766E; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">{source_label}</span>',
             unsafe_allow_html=True,
         )
 

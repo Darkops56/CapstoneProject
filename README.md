@@ -19,11 +19,9 @@ El repositorio está estructurado bajo una arquitectura modular desacoplada:
 │   ├── app.py                     # Entrypoint de producción (Streamlit Cloud)
 │   ├── requirements.txt           # Dependencias mínimas de UI (pandas, pydeck, streamlit, etc.)
 │   ├── .streamlit/config.toml     # Configuración de rendimiento (fileWatcherType = "none")
-│   ├── data/
-│   │   └── fallback_data.csv      # Semilla offline de 964 propiedades curadas
 │   ├── src/                       # Componentes modulares de la interfaz
 │   │   ├── config.py              # Paleta accesible WCAG 2.2 y bounding box CABA
-│   │   ├── data_loader.py         # Conector a Google Drive con fallback automático
+│   │   ├── data_loader.py         # Conector exclusivo a Google Drive (sin fallback local)
 │   │   ├── map_view.py            # Capas Deck.gl (Scatterplot + ColumnLayer 3D)
 │   │   ├── normalizer.py          # Validación defensiva de columnas y tipos
 │   │   └── ui_components.py       # KPIs dinámicos, filtros y tarjetas de alto contraste
@@ -69,8 +67,8 @@ El sistema desacopla el ciclo de Machine Learning del ciclo de Visualización me
              ▼
 [ Visualización en Vivo ]
   (dashboard/app.py en Streamlit Cloud)
-  -> Descarga automáticamente el último CSV de Google Drive.
-  -> Si no hay red o credenciales, degrada a data/fallback_data.csv.
+  -> Consume exclusivamente el CSV mensual publicado en Google Drive.
+  -> Sin fallback a archivos locales: desacoplamiento e higiene 100% cloud.
   -> 100% libre de dependencias pesadas de ML (arranque en segundos).
 ```
 

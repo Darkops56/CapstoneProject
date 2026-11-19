@@ -1,5 +1,5 @@
-"""Data loader supporting Google Drive ingestion with local fallback.
-Resilient against network timeouts, credential failures, and schema mismatch.
+"""Data loader supporting exclusively Google Drive ingestion.
+Strictly decoupled from local filesystem artifacts; zero local fallback.
 """
 import io
 import re
@@ -30,7 +30,11 @@ def get_latest_gdrive_csv(
         resp = requests.get(direct_url, timeout=cfg.REQUEST_TIMEOUT_SECONDS)
         resp.raise_for_status()
         df = pd.read_csv(io.StringIO(resp.text))
-        return df, {"source": "GDRIVE_DIRECT_URL", "reason": "SOURCE_GDRIVE_LATEST"}
+        return df, {
+            "source": "GDRIVE_DIRECT_URL",
+            "reason": "SOURCE_GDRIVE_LATEST",
+            "file_name": direct_url.split("/")[-1] or "gdrive_dataset.csv",
+        }
 
     # Case 2: File ID (Google Drive public or export link)
     if file_id:
@@ -38,7 +42,12 @@ def get_latest_gdrive_csv(
         resp = requests.get(url, timeout=cfg.REQUEST_TIMEOUT_SECONDS)
         resp.raise_for_status()
         df = pd.read_csv(io.StringIO(resp.text))
-        return df, {"source": "GDRIVE_FILE_ID", "reason": "SOURCE_GDRIVE_LATEST"}
+        return df, {
+            "source": "GDRIVE_FILE_ID",
+            "reason": "SOURCE_GDRIVE_LATEST",
+            "file_id": file_id,
+            "file_name": f"gdrive_file_{file_id}.csv",
+        }
 
     # Case 3: Google Drive API via Service Account
     if folder_id and service_account_info:
@@ -87,8 +96,10 @@ def get_latest_gdrive_csv(
     raise ValueError("No Google Drive configuration provided (folder_id, file_id, or direct_url missing)")
 
 
-def load_dataset(local_fallback_path: str = "data/fallback_data.csv") -> Tuple[pd.DataFrame, Dict[str, Any]]:
-    """Loads active dataset from Google Drive if configured, else seamlessly falls back to local data."""
+def load_dataset() -> Tuple[pd.DataFrame, Dict[str, Any]]:
+    """Loads active dataset exclusively from Google Drive.
+    Strictly forbids reading local CSV files; returns an explicit error if unconfigured or unreachable.
+    """
     # Read secrets or environment variables
     folder_id = os.environ.get("GDRIVE_FOLDER_ID")
     file_id = os.environ.get("GDRIVE_FILE_ID")
@@ -118,45 +129,27 @@ def load_dataset(local_fallback_path: str = "data/fallback_data.csv") -> Tuple[p
             except Exception:
                 pass
 
-    # Attempt Google Drive download if any config exists
-    if folder_id or file_id or direct_url:
-        try:
-            df, meta = get_latest_gdrive_csv(
-                folder_id=folder_id,
-                service_account_info=service_account_info,
-                file_id=file_id,
-                direct_url=direct_url,
-            )
-            return df, meta
-        except Exception as e:
-            # Fallback on any failure
-            pass
-
-    # Defensive resolution of local_fallback_path across repo movements
-    resolved_path = local_fallback_path
-    if not os.path.exists(resolved_path):
-        candidates = [
-            os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "data", "fallback_data.csv")),
-            os.path.normpath(os.path.join(os.path.dirname(__file__), "..", local_fallback_path)),
-            os.path.join("dashboard", local_fallback_path),
-            "data/fallback_data.csv",
-            "dashboard/data/fallback_data.csv",
-        ]
-        for c in candidates:
-            if os.path.exists(c):
-                resolved_path = c
-                break
-
-    # Local Fallback
-    try:
-        df = pd.read_csv(resolved_path)
-        return df, {
-            "source": "LOCAL_FALLBACK",
-            "reason": "WARN_DRIVE_FALLBACK_ACTIVE",
-            "fallback_path": resolved_path,
+    # If no Google Drive configuration is found, do NOT fallback to local files
+    if not (folder_id or file_id or direct_url):
+        return pd.DataFrame(), {
+            "source": "GDRIVE_UNCONFIGURED",
+            "reason": "ERR_GDRIVE_NOT_CONFIGURED",
+            "message": "No se detectó configuración de Google Drive (gdrive_csv_url, gdrive_file_id o gdrive_folder_id).",
         }
+
+    # Attempt Google Drive download
+    try:
+        df, meta = get_latest_gdrive_csv(
+            folder_id=folder_id,
+            service_account_info=service_account_info,
+            file_id=file_id,
+            direct_url=direct_url,
+        )
+        return df, meta
     except Exception as e:
         return pd.DataFrame(), {
-            "source": "FAILED",
-            "reason": f"ERR_FALLBACK_FAILED: {str(e)}",
+            "source": "GDRIVE_ERROR",
+            "reason": "ERR_GDRIVE_FETCH_FAILED",
+            "error": str(e),
+            "message": f"Error al descargar dataset desde Google Drive: {str(e)}",
         }

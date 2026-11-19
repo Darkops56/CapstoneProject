@@ -77,16 +77,35 @@ def main():
 
     # 3. State Check: Error State
     if clean_df.empty or norm_meta.get("status") == "SCHEMA_INVALID":
-        st.markdown(
-            f"""
-            <div data-testid="ui-state-error" style="padding: 24px; background-color: #fef2f2; border: 1px solid #f87171; border-radius: 8px; color: #991b1b;">
-                <h3>⚠️ Error al inicializar el catálogo inmobiliario</h3>
-                <p>Código canónico: <code>{norm_meta.get('reason', 'ERR_DATA_INIT_FAILED')}</code></p>
-                <p>Detalle: No se pudieron cargar los datos obligatorios. Verifique la fuente de datos o el archivo de fallback.</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        reason = source_meta.get("reason") or norm_meta.get("reason", "ERR_DATA_INIT_FAILED")
+        if reason == "ERR_GDRIVE_NOT_CONFIGURED":
+            st.markdown(
+                """
+                <div data-testid="ui-state-error" style="padding: 24px; background-color: #0f172a; border: 1px solid #38bdf8; border-radius: 8px; color: #f1f5f9;">
+                    <h3 style="color: #38bdf8; margin-top: 0;">☁️ Conexión con Google Drive Requerida</h3>
+                    <p style="color: #94a3b8;">El Observatorio Inmobiliario está configurado para consumir <strong>únicamente datos en vivo desde Google Drive</strong> (sin respaldo de archivos locales).</p>
+                    <p style="color: #e2e8f0;">Por favor, configure al menos una de las siguientes opciones en <code>.streamlit/secrets.toml</code> o variables de entorno del despliegue:</p>
+                    <ul style="color: #cbd5e1; line-height: 1.8;">
+                        <li><code>gdrive_csv_url</code>: Enlace público o de descarga directa al CSV mensual enriquecido.</li>
+                        <li><code>gdrive_file_id</code>: ID del archivo en Google Drive.</li>
+                        <li><code>gdrive_folder_id</code>: ID de la carpeta en Google Drive (junto con credenciales de Service Account).</li>
+                    </ul>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        else:
+            error_detail = source_meta.get("message") or "No se pudieron cargar los datos desde Google Drive."
+            st.markdown(
+                f"""
+                <div data-testid="ui-state-error" style="padding: 24px; background-color: #450a0a; border: 1px solid #ef4444; border-radius: 8px; color: #fecaca;">
+                    <h3 style="color: #f87171; margin-top: 0;">⚠️ Error al obtener datos desde Google Drive</h3>
+                    <p>Código canónico: <code>{reason}</code></p>
+                    <p>Detalle: {error_detail}</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
         return
 
     # 4. Render Sidebar Filters

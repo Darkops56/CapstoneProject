@@ -132,25 +132,43 @@ def test_normalizer_amenities_graceful_degradation():
 
 
 # -------------------------------------------------------------------------
-# Data Loader & Fallback Tests
+# Google Drive Exclusive Ingestion Tests (Zero Local Fallback)
 # -------------------------------------------------------------------------
 
-def test_data_loader_fallback_when_unconfigured():
-    """Verify transparent fallback to local data when Google Drive is unconfigured."""
-    df, meta = loader.load_dataset(local_fallback_path="data/fallback_data.csv")
-    assert not df.empty
-    assert len(df) == 964
-    assert meta["reason"] == "WARN_DRIVE_FALLBACK_ACTIVE"
-    assert meta["source"] == "LOCAL_FALLBACK"
+def test_data_loader_rejects_unconfigured_drive():
+    """Verify that when Google Drive is unconfigured, zero local files are read and error is returned."""
+    with patch.dict("os.environ", {}, clear=True):
+        df, meta = loader.load_dataset()
+        assert df.empty
+        assert meta["reason"] == "ERR_GDRIVE_NOT_CONFIGURED"
+        assert meta["source"] == "GDRIVE_UNCONFIGURED"
 
 
-def test_data_loader_fallback_on_drive_error():
-    """Verify graceful catch of network / timeout errors and fallback to local seed data."""
-    with patch("src.data_loader.get_latest_gdrive_csv", side_effect=Exception("Connection Timeout")):
-        df, meta = loader.load_dataset(local_fallback_path="data/fallback_data.csv")
-        assert not df.empty
-        assert len(df) == 964
-        assert meta["reason"] == "WARN_DRIVE_FALLBACK_ACTIVE"
+def test_data_loader_drive_error_fails_fast_without_fallback():
+    """Verify that network/fetch errors fail fast and return ERR_GDRIVE_FETCH_FAILED without local fallback."""
+    with patch.dict("os.environ", {"GDRIVE_CSV_URL": "https://drive.google.com/test.csv"}):
+        with patch("src.data_loader.get_latest_gdrive_csv", side_effect=Exception("Connection Timeout")):
+            df, meta = loader.load_dataset()
+            assert df.empty
+            assert meta["reason"] == "ERR_GDRIVE_FETCH_FAILED"
+            assert meta["source"] == "GDRIVE_ERROR"
+
+
+def test_data_loader_successful_gdrive_fetch():
+    """Verify successful parsing when Google Drive returns CSV payload."""
+    mock_df = pd.DataFrame({
+        "listing_id": ["301"],
+        "latitud": [-34.60],
+        "longitud": [-58.40],
+        "costo_total_ars": [950000.0],
+    })
+    with patch.dict("os.environ", {"GDRIVE_CSV_URL": "https://drive.google.com/test.csv"}):
+        with patch("src.data_loader.get_latest_gdrive_csv", return_value=(mock_df, {"source": "GDRIVE_DIRECT_URL", "reason": "SOURCE_GDRIVE_LATEST", "file_name": "alquileres_2026_11.csv"})):
+            df, meta = loader.load_dataset()
+            assert not df.empty
+            assert len(df) == 1
+            assert meta["source"] == "GDRIVE_DIRECT_URL"
+            assert meta["file_name"] == "alquileres_2026_11.csv"
 
 
 # -------------------------------------------------------------------------

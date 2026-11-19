@@ -20,10 +20,10 @@
 
 - [x] 4.1 Implementar componentes modulares de interfaz y máquina de 5 estados en `src/ui_components.py` (barra superior de 1 fila, KPIs, selector de perfil, chips de precio, sidebar colapsable, ficha detallada y paginación acotada a 12 tarjetas) y verificar con `pytest tests/test_dashboard.py -k test_ui_components -v`
 - [x] 4.2 Construir punto de entrada principal `app.py` integrando la tubería completa con `@st.cache_data` y manejo de estados en `st.session_state` y verificar sintaxis con `python3 -m py_compile app.py`
-- [ ] 4.3 Limpiar la rama eliminando artefactos históricos ajenos al runtime de producción del dashboard para dejar un clon liviano listo para deployment y verificar estado limpio con `git status --short`
+- [x] 4.3 Limpiar la rama eliminando artefactos históricos ajenos al runtime de producción del dashboard para dejar un clon liviano listo para deployment y verificar estado limpio con `git status --short`
 
 ## 5. Fase 4: Single Verification Command (SVC Exit Code 0) y Evidencia
 
-- [ ] 5.1 Ejecutar suite completa de tests deterministas verificando 100% de aserciones aprobadas con `pytest tests/test_dashboard.py -v`
-- [ ] 5.2 Levantar servidor local en background y certificar interacción visual y 0 errores de consola mediante `browser_subagent`
-- [ ] 5.3 Generar artefacto obligatorio de cierre `evidence.md` documentando la salida de los tests deterministas, métricas de latencia y evidencia visual
+- [x] 5.1 Ejecutar suite completa de tests deterministas verificando 100% de aserciones aprobadas con `pytest tests/test_dashboard.py -v`
+- [x] 5.2 Levantar servidor local en background y certificar interacción visual y 0 errores de consola mediante `browser_subagent`
+- [x] 5.3 Generar artefacto obligatorio de cierre `evidence.md` documentando la salida de los tests deterministas, métricas de latencia y evidencia visual

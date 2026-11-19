@@ -186,9 +186,11 @@
     },
     {
       "parameters": {
-        "operation": "list",
-        "useQueryString": true,
+        "resource": "fileFolder",
+        "operation": "search",
+        "searchMethod": "queryString",
         "queryString": "='10bpShYlE_FSzUtW3xNz5jH0BGbRGF4yo' in parents and trashed = false and mimeType = 'text/csv'",
+        "returnAll": true,
         "options": {}
       },
       "id": "6b2a47cf-342c-4e8b-8a19-918471c9902f",
@@ -221,6 +223,7 @@
     },
     {
       "parameters": {
+        "resource": "file",
         "operation": "delete",
         "fileId": {
           "__rl": true,

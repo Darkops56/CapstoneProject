@@ -63,6 +63,20 @@ def test_monthly_workflow_semantic_invariants(monthly_workflow):
         or drive_node["parameters"].get("folderId") is not None
     ), "El nodo Google Drive debe tener binaryData: true o folderId configurado"
 
+    # 6. Google Drive Search para retención trimestral
+    search_node = nodes_by_name.get("Google Drive: Listar Archivos 01_mensual_enriquecido")
+    assert search_node is not None
+    assert search_node["parameters"].get("resource") == "fileFolder"
+    assert search_node["parameters"].get("operation") == "search"
+    assert search_node["parameters"].get("searchMethod") == "queryString"
+
+    # 7. Purga a papelera con resource: file y operation: delete
+    purge_node = nodes_by_name.get("Google Drive: Purgar Excedente a Papelera")
+    assert purge_node is not None
+    assert purge_node["parameters"].get("resource") == "file"
+    assert purge_node["parameters"].get("operation") == "delete"
+
+
 
 def test_annual_workflow_semantic_invariants(annual_workflow):
     """Verifica cron anual 0 4 1 3 *, compuerta de idempotencia CKAN y binaryData en Drive."""

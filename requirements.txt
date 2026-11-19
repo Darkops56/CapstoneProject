@@ -1,0 +1,2 @@
+# Root requirements pointing to isolated dashboard dependencies
+-r dashboard/requirements.txt

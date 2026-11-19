@@ -182,4 +182,8 @@ cython_debug/
 
 
 
+# Heavy project assets & academic course materials
+apuntes/
 .apuntes/
+.matplotlib_cache/
+*.xlsx

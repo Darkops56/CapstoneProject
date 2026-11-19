@@ -141,7 +141,7 @@ En tu unidad de [Google Drive](https://drive.google.com/), estructura las siguie
 | **Apify: Actor Curado & Inferencia** | URL | `https://api.apify.com/v2/acts/TU_USUARIO~zonaprop-curator-inference/runs?waitForFinish=120` |
 | **Descargar CSV Enriquecido** | Options > Response | **Response Format: `File`** (descarga binaria, no texto) |
 | **Google Drive: Guardar CSV Mensual** | Resource / Operation | Folder: `01_mensual_enriquecido`, Name: `=alquileres_caba_enriquecido_{{ $now.format('yyyy_MM') }}.csv` |
-| **Google Drive: Listar Archivos 01_mensual_enriquecido** | Resource / Operation | **Resource:** `File/Folder`<br>**Operation:** `Search`<br>**Search Method:** `Advanced Search`<br>**Query String:** `'10bpShYlE_FSzUtW3xNz5jH0BGbRGF4yo' in parents and trashed = false and mimeType = 'text/csv'`<br>**Return All:** `true` |
+| **Google Drive: Listar Archivos 01_mensual_enriquecido** | Resource / Operation | **Resource:** `File/Folder`<br>**Operation:** `Search`<br>**Search Method:** `Advanced Search` (valor interno en JSON: `query`)<br>**Query String:** `'10bpShYlE_FSzUtW3xNz5jH0BGbRGF4yo' in parents and trashed = false and mimeType = 'text/csv'`<br>**Return All:** `true` |
 | **Retención: Filtrar Archivos > 3 Meses** | Code Node (JS) | Ordena por fecha descendente y retorna excedentes a purgar (`items.slice(3)`) si `length > 3`. |
 | **Google Drive: Purgar Excedente a Papelera** | Resource / Operation | **Resource:** `File`<br>**Operation:** `Delete`<br>**File ID:** `={{ $json.fileId }}`<br>**Delete Permanently:** `false` (envía a papelera defensivamente) |
 

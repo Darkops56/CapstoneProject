@@ -188,7 +188,7 @@
       "parameters": {
         "resource": "fileFolder",
         "operation": "search",
-        "searchMethod": "advanced",
+        "searchMethod": "query",
         "queryString": "='10bpShYlE_FSzUtW3xNz5jH0BGbRGF4yo' in parents and trashed = false and mimeType = 'text/csv'",
         "returnAll": true,
         "options": {}

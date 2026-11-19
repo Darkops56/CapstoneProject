@@ -13,18 +13,18 @@
 
 ## 3. Integración en Main y Estructuración MLOps
 
-- [ ] 3.1 Integrar la estructura modular de `dashboard/` en la rama `main` sin alterar los módulos de inferencia (`producto2/` y `actor/`).
-- [ ] 3.2 Formalizar la frontera de MLOps (`producto2/train_models.py`, `producto2/inference.py`, `actor/`) documentando el contrato de exportación de modelos.
-- [ ] 3.3 Verificar que el entrypoint `dashboard/app.py` no requiera librerías de ML (`xgboost`, `scikit-learn`) mediante verificación estática de imports.
+- [x] 3.1 Integrar la estructura modular de `dashboard/` en la rama `main` sin alterar los módulos de inferencia (`producto2/` y `actor/`).
+- [x] 3.2 Formalizar la frontera de MLOps (`producto2/train_models.py`, `producto2/inference.py`, `actor/`) documentando el contrato de exportación de modelos.
+- [x] 3.3 Verificar que el entrypoint `dashboard/app.py` no requiera librerías de ML (`xgboost`, `scikit-learn`) mediante verificación estática de imports.
 
 ## 4. Higiene de Repositorio y Configuración de Despliegue
 
-- [ ] 4.1 Actualizar `.gitignore` en la raíz de `main` para excluir `apuntes/` (~500 MB) y cachés de matplotlib, verificando con `git status --ignored`.
-- [ ] 4.2 Crear un `README.md` maestro en la raíz con arquitectura Monorepo, flujo de reentrenamiento y guía de configuración de Streamlit Cloud (*Main file path*: `dashboard/app.py`).
-- [ ] 4.3 Generar `requirements.txt` mínimo en la raíz referenciando o conteniendo las dependencias del dashboard para compatibilidad con plataformas de despliegue.
+- [x] 4.1 Actualizar `.gitignore` en la raíz de `main` para excluir `apuntes/` (~500 MB) y cachés de matplotlib, verificando con `git status --ignored`.
+- [x] 4.2 Crear un `README.md` maestro en la raíz con arquitectura Monorepo, flujo de reentrenamiento y guía de configuración de Streamlit Cloud (*Main file path*: `dashboard/app.py`).
+- [x] 4.3 Generar `requirements.txt` mínimo en la raíz referenciando o conteniendo las dependencias del dashboard para compatibilidad con plataformas de despliegue.
 
 ## 5. Verificación de Sistema (SVC) y Evidencia
 
-- [ ] 5.1 Ejecutar el comando único de verificación (SVC): `pytest dashboard/tests/ -v` asegurando 11/11 tests exitosos (Exit Code 0).
-- [ ] 5.2 Levantar el servicio en background con `streamlit run dashboard/app.py` y verificar respuesta HTTP 200 en `http://localhost:8501`.
-- [ ] 5.3 Generar artefacto de evidencia `evidence.md` certificando el cumplimiento de todos los escenarios de `specs/monorepo-workspace/spec.md`.
+- [x] 5.1 Ejecutar el comando único de verificación (SVC): `pytest dashboard/tests/ -v` asegurando 11/11 tests exitosos (Exit Code 0).
+- [x] 5.2 Levantar el servicio en background con `streamlit run dashboard/app.py` y verificar respuesta HTTP 200 en `http://localhost:8501`.
+- [x] 5.3 Generar artefacto de evidencia `evidence.md` certificando el cumplimiento de todos los escenarios de `specs/monorepo-workspace/spec.md`.

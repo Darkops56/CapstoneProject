@@ -186,6 +186,68 @@
     },
     {
       "parameters": {
+        "operation": "list",
+        "useQueryString": true,
+        "queryString": "='10bpShYlE_FSzUtW3xNz5jH0BGbRGF4yo' in parents and trashed = false and mimeType = 'text/csv'",
+        "options": {}
+      },
+      "id": "6b2a47cf-342c-4e8b-8a19-918471c9902f",
+      "name": "Google Drive: Listar Archivos 01_mensual_enriquecido",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1552,
+        224
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "riizvhW8kOx9iE8X",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// @ts-nocheck\n// Retención Trimestral: Conservar únicamente los 3 datasets más recientes en 01_mensual_enriquecido\nconst KEEP_COUNT = 3;\nconst items = $input.all();\n\n// Ordenar por fecha de creación descendente (los más nuevos primero)\nitems.sort((a, b) => {\n  const dateA = new Date(a.json.createdTime || a.json.modifiedTime || 0).getTime();\n  const dateB = new Date(b.json.createdTime || b.json.modifiedTime || 0).getTime();\n  return dateB - dateA;\n});\n\n// Protección contra sobre-borrado: si no supera el límite, no purgar nada\nif (items.length <= KEEP_COUNT) {\n  return [];\n}\n\n// Los excedentes (> 3) se envían a la papelera\nconst toDelete = items.slice(KEEP_COUNT);\nreturn toDelete.map(item => ({\n  json: {\n    fileId: item.json.id,\n    name: item.json.name,\n    reason: 'RETENTION_TRIMESTRAL_PURGE',\n    totalBefore: items.length,\n    keptCount: KEEP_COUNT\n  }\n}));"
+      },
+      "id": "3e9b1102-124b-4866-9b1d-c47ef03b901a",
+      "name": "Retención: Filtrar Archivos > 3 Meses",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1776,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.fileId }}",
+          "mode": "id"
+        },
+        "options": {
+          "deletePermanently": false
+        }
+      },
+      "id": "84a7e930-d31e-42c8-897b-990a4dfb88cb",
+      "name": "Google Drive: Purgar Excedente a Papelera",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2000,
+        224
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "riizvhW8kOx9iE8X",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
         "jsCode": "console.log('Ejecución omitida por Circuit Breaker:', $json.reason, $json.message);\nreturn [{ json: { status: 'SKIPPED', details: $json } }];"
       },
       "id": "e5d75da7-80e0-46c5-8412-f01aa83db75d",
@@ -266,6 +328,39 @@
         [
           {
             "node": "Google Drive: Guardar CSV Mensual",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive: Guardar CSV Mensual": {
+      "main": [
+        [
+          {
+            "node": "Google Drive: Listar Archivos 01_mensual_enriquecido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive: Listar Archivos 01_mensual_enriquecido": {
+      "main": [
+        [
+          {
+            "node": "Retención: Filtrar Archivos > 3 Meses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retención: Filtrar Archivos > 3 Meses": {
+      "main": [
+        [
+          {
+            "node": "Google Drive: Purgar Excedente a Papelera",
             "type": "main",
             "index": 0
           }

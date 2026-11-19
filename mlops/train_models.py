@@ -1,7 +1,9 @@
 """Fase 3 (Producto 2): Clustering K-Means, Regresión XGBoost (K-Fold + Tuning), SHAP y exportación .joblib."""
 
+import argparse
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -304,7 +306,11 @@ def train_xgboost_regressor(
     return final_model, report
 
 
-def run_phase3() -> dict[str, Any]:
+def run_phase3(
+    bump: bool = False,
+    registry_path: Path | None = None,
+    min_r2: float = 0.80,
+) -> dict[str, Any]:
     """Ejecuta el entrenamiento completo de Fase 3, exporta .joblib y genera inferencia de muestra."""
     config.PRODUCTO2_DIR.mkdir(parents=True, exist_ok=True)
     config.PRODUCTO2_ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -322,7 +328,7 @@ def run_phase3() -> dict[str, Any]:
         figures_dir=config.PRODUCTO2_FIGURES_DIR,
     )
 
-    # Exportar artefactos .joblib
+    # Exportar artefactos .joblib base
     metadata = {
         "regression_features": xgb_report["features"],
         "cluster_features": CLUSTER_FEATURES,
@@ -370,6 +376,20 @@ def run_phase3() -> dict[str, Any]:
         },
     }
 
+    if bump:
+        try:
+            from mlops import registry
+        except ImportError:
+            import registry
+        version_rec = registry.bump_version(
+            metrics=metrics_report,
+            artifacts_src_dir=config.PRODUCTO2_ARTIFACTS_DIR,
+            target_artifacts_base=config.PRODUCTO2_ARTIFACTS_DIR,
+            registry_path=registry_path,
+            min_r2=min_r2,
+        )
+        metrics_report["registry_version"] = version_rec
+
     with open(config.PRODUCTO2_DIR / "model_metrics.json", "w", encoding="utf-8") as f:
         json.dump(metrics_report, f, ensure_ascii=False, indent=2)
 
@@ -377,7 +397,13 @@ def run_phase3() -> dict[str, Any]:
 
 
 if __name__ == "__main__":
-    rep = run_phase3()
+    parser = argparse.ArgumentParser(description="Entrenamiento y model registry MLOps")
+    parser.add_argument("--bump", action="store_true", help="Incrementar versión y archivar en mlops/artifacts/v(N)/")
+    parser.add_argument("--registry", type=Path, default=None, help="Ruta personalizada a registry.json")
+    parser.add_argument("--min-r2", type=float, default=0.80, help="Umbral mínimo de R2 para aceptar nueva versión")
+    args = parser.parse_args()
+
+    rep = run_phase3(bump=args.bump, registry_path=args.registry, min_r2=args.min_r2)
     print("=== FASE 3: K-MEANS CLUSTERING ===")
     print("k óptimo:", rep["kmeans_clustering"]["optimal_k"], "| Silhouette:", rep["kmeans_clustering"]["optimal_silhouette"])
     print("Perfiles:", json.dumps(rep["kmeans_clustering"]["cluster_profiles"], ensure_ascii=False, indent=2))
@@ -386,5 +412,8 @@ if __name__ == "__main__":
     print("Hold-out Test (20%):", rep["xgboost_regression"]["holdout_test_20pct"])
     print("5-Fold CV OOF (100%):", rep["xgboost_regression"]["kfold_5_oof_full"])
     print("Top SHAP:", rep["xgboost_regression"]["mean_abs_shap_importance"])
+    if "registry_version" in rep:
+        print("\n=== MLOPS REGISTRY: VERSION BUMP ===")
+        print("Nueva versión registrada:", rep["registry_version"]["version"])
     print("\n=== FASE 3: INFERENCIA & SCORE 0-100 ===")
     print(rep["inference_summary"])

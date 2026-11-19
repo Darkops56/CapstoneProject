@@ -1,0 +1,189 @@
+{
+  "production_version": "v1",
+  "min_r2_threshold": 0.8,
+  "versions": {
+    "v1": {
+      "version": "v1",
+      "registered_at": "2026-11-19T22:42:37.537712+00:00",
+      "metrics": {
+        "r2": 0.82,
+        "raw_metrics": {
+          "kmeans_clustering": {
+            "features": [
+              "ruido_db_promedio",
+              "densidad_delitos_500m",
+              "distancia_escuela_m",
+              "lineas_subte_600m",
+              "score_amenities"
+            ],
+            "k_evaluation": [
+              {
+                "k": 2,
+                "inertia": 3595.52,
+                "silhouette": 0.2383
+              },
+              {
+                "k": 3,
+                "inertia": 2993.46,
+                "silhouette": 0.2327
+              },
+              {
+                "k": 4,
+                "inertia": 2515.21,
+                "silhouette": 0.2281
+              },
+              {
+                "k": 5,
+                "inertia": 2170.53,
+                "silhouette": 0.2343
+              },
+              {
+                "k": 6,
+                "inertia": 2004.42,
+                "silhouette": 0.2291
+              }
+            ],
+            "optimal_k": 5,
+            "optimal_silhouette": 0.2343,
+            "cluster_labels": {
+              "3": "Zona Ruidosa/Alta Densidad",
+              "1": "Zona Familiar Tranquila",
+              "2": "Hub Ejecutivo Conectado",
+              "0": "Zona Urbana Conectada",
+              "4": "Zona Residencial Equilibrada"
+            },
+            "cluster_profiles": {
+              "Zona Ruidosa/Alta Densidad": {
+                "cluster_id": 3,
+                "count": 112,
+                "pct_oferta": 11.62,
+                "median_costo_total_ars": 994000.0,
+                "median_ruido_db": 72.5,
+                "median_delitos_500m": 1707.0,
+                "median_dist_escuela_m": 113.88,
+                "median_lineas_subte_600m": 2.0,
+                "median_score_amenities": 1.5
+              },
+              "Zona Familiar Tranquila": {
+                "cluster_id": 1,
+                "count": 255,
+                "pct_oferta": 26.45,
+                "median_costo_total_ars": 1320000.0,
+                "median_ruido_db": 62.5,
+                "median_delitos_500m": 469.0,
+                "median_dist_escuela_m": 166.18,
+                "median_lineas_subte_600m": 0.0,
+                "median_score_amenities": 2.5
+              },
+              "Hub Ejecutivo Conectado": {
+                "cluster_id": 2,
+                "count": 181,
+                "pct_oferta": 18.78,
+                "median_costo_total_ars": 1944000.0,
+                "median_ruido_db": 67.5,
+                "median_delitos_500m": 644.0,
+                "median_dist_escuela_m": 138.15,
+                "median_lineas_subte_600m": 0.0,
+                "median_score_amenities": 8.5
+              },
+              "Zona Urbana Conectada": {
+                "cluster_id": 0,
+                "count": 294,
+                "pct_oferta": 30.5,
+                "median_costo_total_ars": 1200000.0,
+                "median_ruido_db": 72.5,
+                "median_delitos_500m": 865.0,
+                "median_dist_escuela_m": 118.64,
+                "median_lineas_subte_600m": 1.0,
+                "median_score_amenities": 2.0
+              },
+              "Zona Residencial Equilibrada": {
+                "cluster_id": 4,
+                "count": 122,
+                "pct_oferta": 12.66,
+                "median_costo_total_ars": 1321000.0,
+                "median_ruido_db": 72.5,
+                "median_delitos_500m": 462.5,
+                "median_dist_escuela_m": 292.69,
+                "median_lineas_subte_600m": 0.0,
+                "median_score_amenities": 2.5
+              }
+            },
+            "kruskal_costo_total_H": 172.6725,
+            "kruskal_costo_total_p": 2.791542797334278e-36
+          },
+          "xgboost_regression": {
+            "features": [
+              "apto_mascotas",
+              "score_amenities",
+              "m2_totales",
+              "ruido_db_promedio",
+              "densidad_delitos_500m",
+              "distancia_escuela_m",
+              "lineas_subte_600m",
+              "banos",
+              "ambientes",
+              "cocheras"
+            ],
+            "target": "costo_total_ars",
+            "target_transform": "log1p / expm1",
+            "best_params": {
+              "subsample": 0.75,
+              "reg_lambda": 1.0,
+              "reg_alpha": 0.0,
+              "n_estimators": 200,
+              "min_child_weight": 5,
+              "max_depth": 3,
+              "learning_rate": 0.06,
+              "colsample_bytree": 1.0
+            },
+            "holdout_test_20pct": {
+              "MAE_ars": 331223.19,
+              "RMSE_ars": 682586.24,
+              "MAPE_pct": 15.2,
+              "R2": 0.7775
+            },
+            "kfold_5_oof_full": {
+              "MAE_ars": 283010.12,
+              "RMSE_ars": 551401.06,
+              "MAPE_pct": 14.99,
+              "R2": 0.764
+            },
+            "mean_abs_shap_importance": {
+              "m2_totales": 0.2158,
+              "score_amenities": 0.0888,
+              "banos": 0.049,
+              "ambientes": 0.0314,
+              "cocheras": 0.029,
+              "densidad_delitos_500m": 0.0229,
+              "ruido_db_promedio": 0.0203,
+              "lineas_subte_600m": 0.0157,
+              "distancia_escuela_m": 0.0154,
+              "apto_mascotas": 0.0083
+            }
+          },
+          "inference_summary": {
+            "total_properties_scored": 964,
+            "oportunidades_ahorro_gt_10pct": 224,
+            "sobreprecio_gt_10pct": 216,
+            "mean_score_familia": 48.62,
+            "mean_score_soltero_ejecutivo": 50.21
+          },
+          "artifacts": {
+            "kmeans_model": "C:\\Users\\darko\\OneDrive\\Documentos\\Github\\CapstoneProject\\producto2\\artifacts\\kmeans_model.joblib",
+            "xgb_price_model": "C:\\Users\\darko\\OneDrive\\Documentos\\Github\\CapstoneProject\\producto2\\artifacts\\xgb_price_model.joblib",
+            "model_metadata": "C:\\Users\\darko\\OneDrive\\Documentos\\Github\\CapstoneProject\\producto2\\artifacts\\model_metadata.joblib",
+            "resultados_inferencia": "C:\\Users\\darko\\OneDrive\\Documentos\\Github\\CapstoneProject\\producto2\\resultados_inferencia_caba.csv"
+          }
+        }
+      },
+      "artifacts_dir": "/home/luka/Documents/CapstoneProject/mlops/artifacts/v1",
+      "artifacts": [
+        "kmeans_model.joblib",
+        "xgb_price_model.joblib",
+        "model_metadata.joblib"
+      ],
+      "status": "production"
+    }
+  }
+}

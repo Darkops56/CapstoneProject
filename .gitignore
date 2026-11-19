@@ -187,3 +187,10 @@ apuntes/
 .apuntes/
 .matplotlib_cache/
 *.xlsx
+
+# Secrets, local environments & credentials
+secrets.toml
+.streamlit/secrets.toml
+*.env
+.env
+

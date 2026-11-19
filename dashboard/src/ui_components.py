@@ -145,14 +145,19 @@ def render_sidebar_filters(df: pd.DataFrame, meta: Dict[str, Any]) -> Dict[str, 
     st.sidebar.header("Filtros de Propiedades")
 
     # 1. Budget Filter
+    step = 50000
     min_cost = float(df["costo_total_ars"].min()) if not df.empty else 0.0
     max_cost = float(df["costo_total_ars"].max()) if not df.empty else 2000000.0
+    slider_min = int(math.floor(min_cost / step) * step)
+    slider_max = int(math.ceil(max_cost / step) * step)
+    if slider_max <= slider_min:
+        slider_max = slider_min + step
     price_range = st.sidebar.slider(
         "Presupuesto Mensual Total (ARS)",
-        min_value=int(min_cost),
-        max_value=int(max_cost),
-        value=(int(min_cost), int(max_cost)),
-        step=50000,
+        min_value=slider_min,
+        max_value=slider_max,
+        value=(slider_min, slider_max),
+        step=step,
     )
 
     # 2. Neighborhoods

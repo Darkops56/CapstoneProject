@@ -68,7 +68,7 @@ def test_monthly_workflow_semantic_invariants(monthly_workflow):
     assert search_node is not None
     assert search_node["parameters"].get("resource") == "fileFolder"
     assert search_node["parameters"].get("operation") == "search"
-    assert search_node["parameters"].get("searchMethod") == "queryString"
+    assert search_node["parameters"].get("searchMethod") == "advanced"
 
     # 7. Purga a papelera con resource: file y operation: delete
     purge_node = nodes_by_name.get("Google Drive: Purgar Excedente a Papelera")

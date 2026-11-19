@@ -3,13 +3,27 @@
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Datasets y geoespacial
 DATASETS_DIR = BASE_DIR / "Datasets"
 DATASETS_ORIGINALES_DIR = DATASETS_DIR / "Originales"
 DATASETS_CURADOS_DIR = DATASETS_DIR / "Curados"
-PRODUCTO1_DIR = BASE_DIR / "producto1"
-PRODUCTO2_DIR = BASE_DIR / "producto2"
-PRODUCTO2_ARTIFACTS_DIR = PRODUCTO2_DIR / "artifacts"
-PRODUCTO2_FIGURES_DIR = PRODUCTO2_DIR / "figures"
+
+# ETL & Output
+ETL_DIR = BASE_DIR / "etl"
+ETL_OUTPUT_DIR = ETL_DIR / "output"
+PRODUCTO1_DIR = ETL_OUTPUT_DIR  # Compatibilidad
+
+# MLOps & Modelado
+MLOPS_DIR = BASE_DIR / "mlops"
+MLOPS_ARTIFACTS_DIR = MLOPS_DIR / "artifacts"
+MLOPS_FIGURES_DIR = MLOPS_DIR / "figures"
+
+# Aliases de compatibilidad para código y tests existentes
+PRODUCTO2_DIR = MLOPS_DIR
+PRODUCTO2_ARTIFACTS_DIR = MLOPS_ARTIFACTS_DIR
+PRODUCTO2_FIGURES_DIR = MLOPS_FIGURES_DIR
+
 EDA_DIR = BASE_DIR / "eda"
 
 
@@ -31,18 +45,18 @@ DELITOS_PATH = _resolve_input("delitos_2022.xlsx")
 ESCUELAS_PATH = _resolve_input("establecimientos_educativos.xlsx")
 SUBTE_PATH = _resolve_input("bocas-de-subte.csv")
 
-# Rutas de salida (Producto 1 y reportes)
-OUTPUT_CURATED_CSV = PRODUCTO1_DIR / "producto1_dataset_curado.csv"
-OUTPUT_ENRICHED_CSV = PRODUCTO1_DIR / "dataset_enriquecido_completo.csv"
-OUTPUT_EDA_JSON = PRODUCTO1_DIR / "eda_stats.json"
+# Rutas de salida (ETL output y reportes)
+OUTPUT_CURATED_CSV = ETL_OUTPUT_DIR / "producto1_dataset_curado.csv"
+OUTPUT_ENRICHED_CSV = ETL_OUTPUT_DIR / "dataset_enriquecido_completo.csv"
+OUTPUT_EDA_JSON = ETL_OUTPUT_DIR / "eda_stats.json"
 FIGURES_DIR = EDA_DIR / "figures"
 
-# Parámetros configurables de unificación monetaria a ARS (solicitados en especificación)
+# Parámetros configurables de unificación monetaria a ARS
 TIPO_CAMBIO_BASE = 1200.0
 FACTOR_IMPUESTOS_USD = 1.0
 IMPUESTO_SELLOS_ALQUILER = 0.0
 
-# Variable objetivo definida para Producto 1 y 2
+# Variable objetivo definida para MLOps
 TARGET_COL = "costo_total_ars"
 
 # Bounding box oficial aproximado de CABA (WGS84 EPSG:4326)

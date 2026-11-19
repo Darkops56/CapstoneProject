@@ -1,10 +1,10 @@
 # 🏙️ Observatorio Inmobiliario CABA — Monorepo
 
-Sistema integral de inteligencia inmobiliaria para la Ciudad Autónoma de Buenos Aires. El proyecto combina curación geoespacial con datos abiertos del GCBA, modelos predictivos de Machine Learning (XGBoost y KMeans), un pipeline mensual de enriquecimiento en la nube (Apify + n8n) y un dashboard interactivo de visualización geoespacial en tiempo real (Streamlit + PyDeck WebGL).
+Sistema integral de inteligencia inmobiliaria para la Ciudad Autónoma de Buenos Aires. El proyecto combina curación geoespacial con datos abiertos del GCBA, modelado predictivo y MLOps (XGBoost y KMeans), un pipeline mensual de enriquecimiento en la nube (Apify + n8n) y un dashboard interactivo de visualización geoespacial en tiempo real (Streamlit + PyDeck WebGL).
 
 ---
 
-## 🏛️ Arquitectura del Monorepo
+## 🏛️ Arquitectura Limpia del Monorepo
 
 El repositorio está estructurado bajo una arquitectura modular desacoplada:
 
@@ -27,7 +27,7 @@ El repositorio está estructurado bajo una arquitectura modular desacoplada:
 │   │   └── ui_components.py       # KPIs dinámicos, filtros y tarjetas de alto contraste
 │   └── tests/                     # Suite de pruebas unitarias e integración de UI
 │
-├── producto2/                     # 🧠 MLOps: Entrenamiento y Modelado Predictivo
+├── mlops/                         # 🧠 MLOps: Entrenamiento, Inferencia y Model Registry
 │   ├── train_models.py            # Reentrenamiento periódico (XGBoost + KMeans)
 │   ├── inference.py               # Script de inferencia por lotes
 │   ├── artifacts/                 # Modelos serializados (.joblib)
@@ -41,21 +41,47 @@ El repositorio está estructurado bajo una arquitectura modular desacoplada:
 │
 ├── etl/                           # 🗺️ Ingesta y Curación Geoespacial
 │   ├── etl_pipeline.py            # Cruce espacial con subtes, escuelas, delitos y ruido GCBA
-│   └── Datasets/Curados/          # Datasets urbanos curados de referencia
+│   └── output/                    # Datasets curados intermedios
+│
+├── Datasets/                      # 📍 Datos Geográficos de Referencia CABA
+│   ├── Originales/                # Datos oficiales GCBA (ruido, subte, escuelas, delitos)
+│   └── Curados/                   # Versiones estandarizadas en WGS84
+│
+├── eda/                           # 📊 Análisis Exploratorio Estadístico
+│   ├── eda_phase2.py              # Script de validación de hipótesis y VIF
+│   └── figures/                   # Gráficos y matrices de correlación
+│
+├── docs/                          # 📚 Documentación Centralizada Unificada
+│   ├── architecture/              # Guías de arquitectura, ETL, EDA y MLOps
+│   ├── business_questions.md      # Formulación de preguntas de negocio
+│   ├── feature_selection.md       # Tabla de features seleccionadas y VIF
+│   ├── README_DEPLOYMENT_N8N.md   # Guía de orquestación en n8n
+│   └── evidence/                  # Reportes de verificación continua
+│
+├── scripts/                       # 🛠️ Utilidades y Scripts Auxiliares
+│   ├── prepare_geo_cache.py       # Precomputación de KD-Trees y BallTrees geoespaciales
+│   └── fetch_apify_raw.py         # Script seguro de descarga cruda vía env var APIFY_TOKEN
+│
+├── tests/                         # 🧪 Suite de Pruebas de Backend
+│   ├── fixtures/                  # Muestras JSON y CSV para tests de integración
+│   └── test_*.py                  # Tests unitarios deterministas
+│
+├── config/                        # ⚙️ Configuración y Constantes Globales
+│   └── settings.py                # Resolución centralizada de paths y parámetros
 │
 └── workflows/                     # ⚙️ Automatización y Orquestación
-    └── n8n/                       # Flujos mensuales de scraping, inferencia y publicación
+    └── n8n/                       # Flujos mensuales de scraping, inferencia y retención Drive
 ```
 
 ---
 
 ## 🔄 Ciclos de Vida y Desacoplamiento
 
-El sistema desacopla el ciclo de Machine Learning del ciclo de Visualización mediante un **contrato por artefacto (CSV enriquecido)**:
+El sistema desacopla el ciclo de Machine Learning del ciclo de Visualización mediante un **contrato por artefacto (CSV enriquecido en Google Drive)**:
 
 ```
 [ Reentrenamiento MLOps ]
-  (producto2/train_models.py) -> Exporta modelos a artifacts/ (.joblib)
+  (mlops/train_models.py) -> Exporta modelos a artifacts/ (.joblib)
              │
              ▼
 [ Ingesta Mensual Cloud ]
@@ -88,10 +114,10 @@ Para desplegar este monorepo en Streamlit Community Cloud:
    En los ajustes avanzados (*Advanced settings -> Secrets*), ingresa:
    ```toml
    # Opción 1: Enlace directo al CSV mensual exportado
-   gdrive_csv_url = "https://tu-url-o-enlace-directo/alquileres_caba_enriquecido.csv"
+   gdrive_csv_url = "https://drive.google.com/uc?export=download&id=TU_ID_DE_ARCHIVO"
 
-   # Opción 2: Carpeta de Google Drive gestionada por Service Account
-   gdrive_folder_id = "TU_ID_DE_CARPETA_EN_GDRIVE"
+   # Opción 2: ID directo del archivo de Drive
+   gdrive_file_id = "TU_ID_DE_ARCHIVO"
    ```
 4. **Deploy**: Haz clic en **Deploy**. Streamlit Cloud detectará automáticamente `dashboard/requirements.txt` y levantará la aplicación sin instalar librerías pesadas de entrenamiento.
 
@@ -101,25 +127,18 @@ Para desplegar este monorepo en Streamlit Community Cloud:
 
 ### 1. Levantar el Dashboard
 ```bash
-# Instalar dependencias del dashboard
 pip install -r dashboard/requirements.txt
-
-# Ejecutar la aplicación
 streamlit run dashboard/app.py
 ```
 Accede a `http://localhost:8501`.
 
 ### 2. Reentrenar Modelos de Machine Learning
 ```bash
-# Instalar dependencias de ML
 pip install scikit-learn xgboost shap joblib
-
-# Ejecutar entrenamiento
-python producto2/train_models.py
+python mlops/train_models.py
 ```
 
 ### 3. Ejecutar Pruebas Automatizadas
-El proyecto cuenta con un arnés unificado en `pytest.ini`:
 ```bash
 # Ejecutar todas las pruebas (ML + Dashboard)
 pytest
@@ -127,10 +146,3 @@ pytest
 # Ejecutar únicamente las pruebas del dashboard
 pytest dashboard/tests/ -v
 ```
-
----
-
-## 🛡️ Estándares de Accesibilidad y Rendimiento
-* **WCAG 2.2 AA**: Paleta de colores de alto contraste (`#1e293b`, `#38bdf8`, `#0F766E`, `#DC2626`) legible en modos claro y oscuro.
-* **Resiliencia de Red**: Degradación suave garantizada sin crashes ante fallas de conectividad externa.
-* **Control de Inotify**: Configuración optimizada en Linux con `fileWatcherType = "none"`.

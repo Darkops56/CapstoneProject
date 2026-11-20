@@ -86,9 +86,9 @@ def main():
                     <p style="color: #94a3b8;">El Observatorio Inmobiliario está configurado para consumir <strong>únicamente datos en vivo desde Google Drive</strong> (sin respaldo de archivos locales).</p>
                     <p style="color: #e2e8f0;">Por favor, configure al menos una de las siguientes opciones en <code>.streamlit/secrets.toml</code> o variables de entorno del despliegue:</p>
                     <ul style="color: #cbd5e1; line-height: 1.8;">
-                        <li><code>gdrive_csv_url</code>: Enlace público o de descarga directa al CSV mensual enriquecido.</li>
-                        <li><code>gdrive_file_id</code>: ID del archivo en Google Drive.</li>
-                        <li><code>gdrive_folder_id</code>: ID de la carpeta en Google Drive (junto con credenciales de Service Account).</li>
+                        <li><code>gdrive_folder_id</code> + <code>gdrive_api_key</code>: ID o URL de la carpeta pública en Google Drive + API Key para autodetectar el CSV mensual más reciente (recomendado).</li>
+                        <li><code>gdrive_file_id</code>: ID o URL de un archivo CSV público específico en Google Drive.</li>
+                        <li><code>gdrive_csv_url</code>: Enlace de descarga directa al CSV mensual enriquecido.</li>
                     </ul>
                 </div>
                 """,

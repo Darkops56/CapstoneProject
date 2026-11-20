@@ -18,18 +18,36 @@ def _extract_year_month(filename: str) -> Tuple[int, int]:
     return 0, 0
 
 
+def _extract_drive_id(value: Optional[str]) -> Optional[str]:
+    """Extracts a Google Drive file or folder ID from a full URL, or returns the raw ID."""
+    if not value:
+        return value
+    cleaned = value.strip()
+    m = re.search(r"/(?:folders|file/d)/([a-zA-Z0-9_-]+)", cleaned)
+    if m:
+        return m.group(1)
+    m_param = re.search(r"[?&]id=([a-zA-Z0-9_-]+)", cleaned)
+    if m_param:
+        return m_param.group(1)
+    return cleaned
+
+
 def get_latest_gdrive_csv(
     folder_id: Optional[str] = None,
     service_account_info: Optional[dict] = None,
     file_id: Optional[str] = None,
     direct_url: Optional[str] = None,
+    api_key: Optional[str] = None,
 ) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     """Attempts to download the latest monthly CSV from Google Drive."""
+    folder_id = _extract_drive_id(folder_id)
+    file_id = _extract_drive_id(file_id)
+
     # Case 1: Direct CSV URL
     if direct_url:
         resp = requests.get(direct_url, timeout=cfg.REQUEST_TIMEOUT_SECONDS)
         resp.raise_for_status()
-        df = pd.read_csv(io.StringIO(resp.text))
+        df = pd.read_csv(io.BytesIO(resp.content))
         return df, {
             "source": "GDRIVE_DIRECT_URL",
             "reason": "SOURCE_GDRIVE_LATEST",
@@ -41,7 +59,7 @@ def get_latest_gdrive_csv(
         url = f"https://drive.google.com/uc?export=download&id={file_id}"
         resp = requests.get(url, timeout=cfg.REQUEST_TIMEOUT_SECONDS)
         resp.raise_for_status()
-        df = pd.read_csv(io.StringIO(resp.text))
+        df = pd.read_csv(io.BytesIO(resp.content))
         return df, {
             "source": "GDRIVE_FILE_ID",
             "reason": "SOURCE_GDRIVE_LATEST",
@@ -49,7 +67,44 @@ def get_latest_gdrive_csv(
             "file_name": f"gdrive_file_{file_id}.csv",
         }
 
-    # Case 3: Google Drive API via Service Account
+    # Case 3a: Google Drive API v3 via API Key (public folder, zero extra SDK dependencies)
+    if folder_id and api_key:
+        query = f"'{folder_id}' in parents and trashed = false and name contains 'alquileres_caba_enriquecido_'"
+        list_resp = requests.get(
+            "https://www.googleapis.com/drive/v3/files",
+            params={
+                "q": query,
+                "fields": "files(id, name, modifiedTime)",
+                "pageSize": 20,
+                "key": api_key,
+            },
+            timeout=cfg.REQUEST_TIMEOUT_SECONDS,
+        )
+        list_resp.raise_for_status()
+
+        files = list_resp.json().get("files", [])
+        if not files:
+            raise ValueError(f"No files matching pattern found in folder {folder_id}")
+
+        files.sort(key=lambda x: (_extract_year_month(x["name"]), x.get("modifiedTime", "")), reverse=True)
+        latest_file = files[0]
+
+        file_resp = requests.get(
+            f"https://www.googleapis.com/drive/v3/files/{latest_file['id']}",
+            params={"alt": "media", "key": api_key},
+            timeout=cfg.REQUEST_TIMEOUT_SECONDS,
+        )
+        file_resp.raise_for_status()
+
+        df = pd.read_csv(io.BytesIO(file_resp.content))
+        return df, {
+            "source": "GDRIVE_FOLDER_API_KEY",
+            "reason": "SOURCE_GDRIVE_LATEST",
+            "file_name": latest_file["name"],
+            "file_id": latest_file["id"],
+        }
+
+    # Case 3b: Google Drive API via Service Account
     if folder_id and service_account_info:
         from google.oauth2 import service_account
         from googleapiclient.discovery import build
@@ -93,7 +148,9 @@ def get_latest_gdrive_csv(
             "file_id": latest_file["id"],
         }
 
-    raise ValueError("No Google Drive configuration provided (folder_id, file_id, or direct_url missing)")
+    raise ValueError(
+        "No Google Drive configuration provided (direct_url, file_id, or folder_id with api_key/service_account missing)"
+    )
 
 
 def load_dataset() -> Tuple[pd.DataFrame, Dict[str, Any]]:
@@ -104,6 +161,7 @@ def load_dataset() -> Tuple[pd.DataFrame, Dict[str, Any]]:
     folder_id = os.environ.get("GDRIVE_FOLDER_ID")
     file_id = os.environ.get("GDRIVE_FILE_ID")
     direct_url = os.environ.get("GDRIVE_CSV_URL")
+    api_key = os.environ.get("GDRIVE_API_KEY")
     service_account_json = os.environ.get("GCP_SERVICE_ACCOUNT")
 
     # Check Streamlit secrets if running inside streamlit
@@ -113,6 +171,7 @@ def load_dataset() -> Tuple[pd.DataFrame, Dict[str, Any]]:
             folder_id = folder_id or st.secrets.get("gdrive_folder_id")
             file_id = file_id or st.secrets.get("gdrive_file_id")
             direct_url = direct_url or st.secrets.get("gdrive_csv_url")
+            api_key = api_key or st.secrets.get("gdrive_api_key")
             if "gcp_service_account" in st.secrets:
                 service_account_json = st.secrets["gcp_service_account"]
     except Exception:
@@ -144,6 +203,7 @@ def load_dataset() -> Tuple[pd.DataFrame, Dict[str, Any]]:
             service_account_info=service_account_info,
             file_id=file_id,
             direct_url=direct_url,
+            api_key=api_key,
         )
         return df, meta
     except Exception as e:

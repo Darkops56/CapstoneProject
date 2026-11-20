@@ -171,6 +171,48 @@ def test_data_loader_successful_gdrive_fetch():
             assert meta["file_name"] == "alquileres_2026_11.csv"
 
 
+def test_data_loader_extract_drive_id():
+    """Verify folder and file URLs are normalized to raw Google Drive IDs."""
+    assert loader._extract_drive_id("10bpShYlE_FSzUtW3xNz5jH0BGbRGF4yo") == "10bpShYlE_FSzUtW3xNz5jH0BGbRGF4yo"
+    assert (
+        loader._extract_drive_id("https://drive.google.com/drive/u/1/folders/10bpShYlE_FSzUtW3xNz5jH0BGbRGF4yo")
+        == "10bpShYlE_FSzUtW3xNz5jH0BGbRGF4yo"
+    )
+    assert (
+        loader._extract_drive_id("https://drive.google.com/file/d/1Ry7pB969p9rtzhdmREu8HmpwbSzSUDka/view?usp=drivesdk")
+        == "1Ry7pB969p9rtzhdmREu8HmpwbSzSUDka"
+    )
+
+
+def test_data_loader_folder_api_key_autodetects_latest_csv():
+    """Verify folder_id + api_key lists files, selects latest YYYY_MM CSV, and parses UTF-8 payload."""
+    list_resp = MagicMock()
+    list_resp.raise_for_status.return_value = None
+    list_resp.json.return_value = {
+        "files": [
+            {"id": "old_id", "name": "alquileres_caba_enriquecido_2026_10.csv", "modifiedTime": "2026-10-20T10:00:00Z"},
+            {"id": "new_id", "name": "alquileres_caba_enriquecido_2026_11.csv", "modifiedTime": "2026-11-19T18:00:00Z"},
+        ]
+    }
+    file_resp = MagicMock()
+    file_resp.raise_for_status.return_value = None
+    file_resp.content = "listing_id,barrio,costo_total_ars\n1,Núñez,2203000\n".encode("utf-8")
+
+    with patch("src.data_loader.requests.get", side_effect=[list_resp, file_resp]) as mock_get:
+        df, meta = loader.get_latest_gdrive_csv(
+            folder_id="https://drive.google.com/drive/u/1/folders/10bpShYlE_FSzUtW3xNz5jH0BGbRGF4yo",
+            api_key="test-api-key",
+        )
+        assert len(df) == 1
+        assert df.iloc[0]["barrio"] == "Núñez"
+        assert meta["source"] == "GDRIVE_FOLDER_API_KEY"
+        assert meta["file_name"] == "alquileres_caba_enriquecido_2026_11.csv"
+        assert meta["file_id"] == "new_id"
+        assert mock_get.call_count == 2
+        assert "10bpShYlE_FSzUtW3xNz5jH0BGbRGF4yo" in mock_get.call_args_list[0].kwargs["params"]["q"]
+        assert mock_get.call_args_list[1].args[0].endswith("/files/new_id")
+
+
 # -------------------------------------------------------------------------
 # Map View Tests
 # -------------------------------------------------------------------------

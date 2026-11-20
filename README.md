@@ -11,6 +11,7 @@ El repositorio está estructurado bajo una arquitectura modular desacoplada:
 ```
 .
 ├── README.md                      # Documentación maestra del sistema
+├── pipeline_observatorio_caba.ipynb # 📓 Notebook Maestro End-to-End comentado (Ingesta Live -> ETL -> EDA -> ML -> Inferencia)
 ├── requirements.txt               # Referencia a dashboard/requirements.txt para Streamlit Cloud
 ├── pytest.ini                     # Arnés de pruebas unificado (ML + Dashboard)
 ├── .gitignore                     # Exclusión de archivos pesados (>50MB) y cachés
@@ -47,12 +48,9 @@ El repositorio está estructurado bajo una arquitectura modular desacoplada:
 │   └── src/                       # Pipeline de reentrenamiento, validación y backup a Drive
 │
 ├── etl/                           # 🗺️ Ingesta y Curación Geoespacial
-│   ├── etl_pipeline.py            # Cruce espacial con subtes, escuelas, delitos y ruido GCBA
-│   └── output/                    # Datasets curados intermedios
+│   └── etl_pipeline.py            # Cruce espacial con subtes, escuelas, delitos y ruido GCBA (output/ creado en runtime)
 │
-├── Datasets/                      # 📍 Datos Geográficos de Referencia CABA
-│   ├── Originales/                # Datos oficiales GCBA (ruido, subte, escuelas, delitos)
-│   └── Curados/                   # Versiones estandarizadas en WGS84
+├── Datasets/                      # 📍 (Excluido de git) Generado dinámicamente al ejecutar pipeline_observatorio_caba.ipynb
 │
 ├── eda/                           # 📊 Análisis Exploratorio Estadístico
 │   ├── eda_phase2.py              # Script de validación de hipótesis y VIF

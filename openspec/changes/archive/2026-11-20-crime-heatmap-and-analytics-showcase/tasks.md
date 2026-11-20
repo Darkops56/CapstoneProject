@@ -1,0 +1,30 @@
+# Tasks: Crime Heatmap Layer & Executive Analytics Showcase Notebook
+
+## 1. Fase 0 — Firmas, Constantes y Contratos (Stubs)
+
+- [x] 1.1 Definir constantes cromáticas y parámetros WebGL del mapa de calor (`CRIME_HEATMAP_COLOR_RANGE`, `CRIME_HEATMAP_RADIUS_PIXELS = 55`, `CRIME_HEATMAP_INTENSITY = 1.2`, `CRIME_HEATMAP_THRESHOLD = 0.05`, `CRIME_HEATMAP_OPACITY = 0.6`, `CRIME_HEATMAP_MAX_POINTS = 2000`) en `dashboard/src/config.py`. Verificación: `python3 -c "import sys; sys.path.insert(0, 'dashboard'); import src.config as c; assert len(c.CRIME_HEATMAP_COLOR_RANGE) == 6 and c.CRIME_HEATMAP_COLOR_RANGE[-1][0] >= 160"`
+- [x] 1.2 Declarar la firma retrocompatible de `build_pydeck_chart(..., show_crime_heatmap: bool = False, crime_metric: str = "VOLUMEN", heatmap_df: Optional[pd.DataFrame] = None)` en `dashboard/src/map_view.py` y el helper stub `compute_crime_weights(df)` en `dashboard/src/normalizer.py` (sin romper los 50 tests existentes). Verificación: `pytest -q`
+
+## 2. Fase 1 — Harness de Pruebas Deterministas (Red / Negative-Path First)
+
+- [x] 2.1 Agregar pruebas negativas y de frontera en `dashboard/tests/test_dashboard.py` cubriendo: (a) `INFO_CRIME_FULL_AVAILABLE` con recorte p95 en `[0.0, 1.0]`, (b) degradación `INFO_CRIME_GRAVITY_UNAVAILABLE` para CSV histórico sin gravedad, (c) `INFO_CRIME_HEATMAP_UNAVAILABLE` cuando faltan ambas columnas, (d) protección división por cero con ceros/`NaN`/negativos, (e) toggle OFF = 1 capa (`ScatterplotLayer`), (f) toggle ON = 2 capas `[HeatmapLayer(pickable=False), ScatterplotLayer(id="ScatterplotLayer", pickable=True, stroked=True)]` con proyección slim de exactamente 3 columnas, payload JSON `<= 250 KB`, uso de `clean_df` (no `df_filtered`) y fallback de `GRAVEDAD` -> `VOLUMEN`. Verificación: `pytest dashboard/tests/test_dashboard.py -k "crime_heatmap" -q` (confirmar fallo esperado Red)
+- [x] 2.2 Agregar prueba en `tests/test_apify_actor.py` validando que `curate_and_enrich` exporta `indice_gravedad_delitos_500m` flotante, sin `NaN` y `>= 0.0` (incluyendo caso sin vecinos = `0.0`). Verificación: `pytest tests/test_apify_actor.py -k "gravedad" -q` (confirmar fallo esperado Red)
+- [x] 2.3 Crear `tests/test_showcase_notebook.py` validando que `notebooks/observatorio_caba_showcase.ipynb` existe, es JSON válido de notebook v4, contiene cobertura de `Q1`–`Q5`, `H1`–`H6`, análisis de delitos (volumen y gravedad), K-Means, XGBoost + `pred_contribs`, MLOps Registry `v1`, `>= 6` figuras embebidas `image/png` en `outputs`, y cero imports de paquetes prohibidos (`plotly`, `folium`, `shap`, `statsmodels`). Verificación: `pytest tests/test_showcase_notebook.py -q` (confirmar fallo esperado Red)
+
+## 3. Fase 2 — Implementación Core (Actor + Normalizer + PyDeck Heatmap + Notebook B1)
+
+- [x] 3.1 Implementar el cálculo de `indice_gravedad_delitos_500m` en `actor/src/pipeline.py` reutilizando `del_neighbors` y `del_bundle["peso_gravedad"]` ya cargados en memoria. Verificación: `pytest tests/test_apify_actor.py -q`
+- [x] 3.2 Implementar `compute_crime_weights` e integrarlo en `normalize_schema` en `dashboard/src/normalizer.py` con normalización winsorizada p95, protección contra `p95 <= 0`, y emisión exacta de `crime_heatmap_status` y `available_crime_metrics`. Verificación: `pytest dashboard/tests/test_dashboard.py -k "crime" -q`
+- [x] 3.3 Implementar la construcción condicional de `HeatmapLayer` (proyección slim de 3 columnas redondeadas, agregación espacial si `len > 2000`, `pickable=False`, degradación de métrica ausente) y `stroked=True` en `ScatterplotLayer` dentro de `dashboard/src/map_view.py`. Verificación: `pytest dashboard/tests/test_dashboard.py -q`
+- [x] 3.4 Construir el notebook ejecutivo end-to-end `notebooks/observatorio_caba_showcase.ipynb` sintetizando documentos (`docs/architecture/00..04`, `docs/business_questions.md`, `mlops/registry.json`) y datos reales con gráficos de alta calidad usando únicamente librerías del entorno (`matplotlib`, `seaborn`, `scipy`, `scikit-learn`, `xgboost` con `pred_contribs=True`, `pydeck`). Verificación: `python3 -c "import json; nb=json.load(open('notebooks/observatorio_caba_showcase.ipynb')); assert len(nb['cells']) >= 12"`
+
+## 4. Fase 3 — Integración y Consumo en Frontera (UI TopBar + App + Ejecución del Notebook)
+
+- [x] 4.1 Integrar el toggle `Mapa de Calor: Delitos` (default `False`), el selector de métrica (`Volumen` / `Gravedad`) y el badge de degradación (`data-testid="crime-heatmap-status"`) en la barra superior de `dashboard/src/ui_components.py`, más la leyenda `data-testid="crime-heatmap-legend"` y el pasaje de `heatmap_df=clean_df` en `dashboard/app.py`. Verificación: `pytest dashboard/tests/test_dashboard.py -q`
+- [x] 4.2 Ejecutar todas las celdas de `notebooks/observatorio_caba_showcase.ipynb` de forma determinista y persistir sus outputs (`image/png` y texto) en el propio `.ipynb`, validando cero errores y tiempos de ejecución limpios. Verificación: `pytest tests/test_showcase_notebook.py -q`
+
+## 5. Fase 4 — SVC (Exit Code 0), Verificación Browser y Evidencia
+
+- [x] 5.1 Ejecutar la suite de regresión completa del monorepo (`50` tests previos + nuevos tests de Actor, Dashboard y Notebook) verificando `Exit Code 0`. Verificación: `pytest -v`
+- [x] 5.2 Levantar el dashboard Streamlit temporalmente (conectado a un CSV enriquecido vía servidor HTTP local de prueba para simular `GDRIVE_CSV_URL` sin tocar Drive) y verificar con `browser_subagent` la barra superior, activación del toggle ON/OFF, cambio de métrica `Volumen` / `Gravedad`, presencia de `data-testid="crime-heatmap-legend"` y renderizado del mapa sin errores de consola. Verificación: captura y reporte verificado en `docs/evidence/evidence_crime_heatmap_and_showcase.md`
+- [x] 5.3 Generar el artefacto obligatorio `docs/evidence/evidence_crime_heatmap_and_showcase.md` con la salida completa de `pytest -v`, métricas de benchmark de payload/latencia y evidencia de validación visual del dashboard y del notebook. Verificación: `test -s docs/evidence/evidence_crime_heatmap_and_showcase.md && openspec validate crime-heatmap-and-analytics-showcase --strict`

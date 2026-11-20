@@ -6,7 +6,7 @@ import pytest
 import numpy as np
 import pandas as pd
 
-from actor.src import pipeline, main
+from actors.inference.src import pipeline, main
 
 
 @pytest.fixture
@@ -80,7 +80,7 @@ def test_run_pipeline_end_to_end(sample_properties_raw):
 
 
 def test_actor_hermetic_isolation():
-    """Verifica que actor.src.pipeline no importe etl ni producto2 (aislamiento hermético)."""
+    """Verifica que actors.inference.src.pipeline no importe etl ni producto2 (aislamiento hermético)."""
     import subprocess
     import sys
 
@@ -94,7 +94,7 @@ sys.modules['producto2'] = None
 sys.modules['producto2.inference'] = None
 
 # Intentar importar el pipeline del actor
-import actor.src.pipeline as p
+import actors.inference.src.pipeline as p
 assert hasattr(p, 'curate_and_enrich')
 assert hasattr(p, 'predict_and_score')
 print("HERMETIC_SUCCESS")
@@ -106,7 +106,7 @@ print("HERMETIC_SUCCESS")
 
 def test_nlp_parser():
     """Verifica utilidades del módulo nlp_parser."""
-    from actor.src import nlp_parser
+    from actors.inference.src import nlp_parser
 
     # Parse price
     ars = nlp_parser.parse_price_ars("1500", "USD", tipo_cambio=1000.0, factor_usd=1.0, sellos=0.0)
@@ -124,7 +124,7 @@ def test_nlp_parser():
 
 def test_scoring():
     """Verifica utilidades del módulo scoring."""
-    from actor.src import scoring
+    from actors.inference.src import scoring
 
     # Recommendation
     rec = scoring._classify_recommendation(80.0, 2.0)
@@ -140,4 +140,33 @@ def test_scoring():
         profile="FAMILIA",
     )
     assert 0.0 <= score <= 100.0
+
+
+def test_curate_and_enrich_exports_indice_gravedad_delitos_500m():
+    """Verifica que curate_and_enrich exporte indice_gravedad_delitos_500m float sin NaNs y >= 0.0."""
+    from actors.inference.src import pipeline
+
+    sample_props = [
+        {
+            "listingId": "test_palermo",
+            "list_latitude": -34.5885,
+            "list_longitude": -58.4299,
+            "list_price_amount": 850000,
+            "list_price_currency": "ARS",
+        },
+        {
+            "listingId": "test_edge_no_neighbors",
+            "list_latitude": -34.704,
+            "list_longitude": -58.534,
+            "list_price_amount": 600000,
+            "list_price_currency": "ARS",
+        },
+    ]
+    df_out = pipeline.curate_and_enrich(sample_props)
+    assert "indice_gravedad_delitos_500m" in df_out.columns
+    assert pd.api.types.is_float_dtype(df_out["indice_gravedad_delitos_500m"])
+    assert df_out["indice_gravedad_delitos_500m"].isna().sum() == 0
+    assert (df_out["indice_gravedad_delitos_500m"] >= 0.0).all()
+    assert df_out.loc[0, "indice_gravedad_delitos_500m"] > 0.0
+
 

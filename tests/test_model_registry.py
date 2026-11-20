@@ -206,8 +206,8 @@ def test_shap_background_and_atomic_exporter(temp_registry_env):
     """Verifica el subsampling acotado de SHAP (N<=100) y el exportador atómico en modo dry_run."""
     import numpy as np
     import pandas as pd
-    from trainer.src.train_pipeline import compute_shap_background
-    from trainer.src.gdrive_exporter import export_version_to_gdrive_atomic
+    from actors.trainer.src.train_pipeline import compute_shap_background
+    from actors.trainer.src.gdrive_exporter import export_version_to_gdrive_atomic
 
     X_large = pd.DataFrame(np.random.randn(250, 4), columns=["a", "b", "c", "d"])
     bg = compute_shap_background(X_large, max_samples=100)

@@ -12,7 +12,7 @@ from sklearn.neighbors import BallTree
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 CURADOS_DIR = BASE_DIR / "Datasets" / "Curados"
-OUTPUT_DIR = BASE_DIR / "actor" / "reference_geo"
+OUTPUT_DIR = BASE_DIR / "actors" / "inference" / "reference_geo"
 
 
 def _set_max_csv_field_limit() -> None:

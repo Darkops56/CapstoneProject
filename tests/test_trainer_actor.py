@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from trainer.src.train_pipeline import (
+from actors.trainer.src.train_pipeline import (
     CLUSTER_FEATURES,
     REGRESSION_FEATURES,
     InsufficientDataError,
@@ -16,7 +16,7 @@ from trainer.src.train_pipeline import (
     train_kmeans,
     train_xgboost,
 )
-from trainer.src.gdrive_exporter import (
+from actors.trainer.src.gdrive_exporter import (
     export_version_to_gdrive,
     get_manifest_from_drive,
     get_next_manifest_version,
@@ -128,7 +128,7 @@ def test_export_version_dry_run(tmp_path: Path):
 
 def test_load_dataset_from_csv_text_list_and_dedup():
     """Verifica que load_dataset_from_input concatene listas de CSVs desde n8n y deduplique por clave natural."""
-    from trainer.src.main import load_dataset_from_input
+    from actors.trainer.src.main import load_dataset_from_input
 
     csv_1 = (
         "calle_normalizada,m2_cubiertos,ambientes,costo_total_ars\n"

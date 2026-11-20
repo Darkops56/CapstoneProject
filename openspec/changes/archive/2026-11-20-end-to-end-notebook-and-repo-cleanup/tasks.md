@@ -1,0 +1,24 @@
+## 0. Fase 0 · Firmas y Stubs de Contrato (`NotImplementedError`)
+
+- [x] 0.1 Crear el módulo `scripts/notebook_helpers.py` con las firmas públicas, constantes (`CKAN_CATALOG`, tokens canónicos `ERR_MISSING_APIFY_TOKEN`, `ERR_INVALID_APIFY_MODE`, `ERR_GCBA_DOWNLOAD`, `ERR_GCBA_SCHEMA`, `ERR_APIFY_SCRAPER_FAILED`, `ERR_METRIC_REGRESSION`) y stubs con `raise NotImplementedError` para `ensure_runtime_dirs`, `select_ckan_resource`, `download_gcba_datasets`, `fetch_zonaprop_apify`, `evaluate_baseline_vs_models` y `compute_subgroup_error_audit`. Validación: `python3 -c "import scripts.notebook_helpers as h; assert hasattr(h, 'ensure_runtime_dirs')"` (Exit Code `0`).
+
+## 1. Fase 1 · Harness de Pruebas Deterministas (Red)
+
+- [x] 1.1 Crear `tests/test_end_to_end_notebook.py` con pruebas Negative-Path First y de contrato para `scripts/notebook_helpers.py`: creación dinámica de carpetas en `tmp_path`, rechazo con `ERR_MISSING_APIFY_TOKEN` (0 requests HTTP), rechazo con `ERR_INVALID_APIFY_MODE`, fallos CKAN (`ERR_GCBA_DOWNLOAD`, `ERR_GCBA_SCHEMA`), descarga Apify mockeada (`last_run` y `run_new`), comparativa 4 modelos + `ERR_METRIC_REGRESSION` y auditoría de error por barrio/cuartil. Validación: `pytest tests/test_end_to_end_notebook.py -k "not notebook_structure"` (fallo esperado Red sobre stubs `NotImplementedError`).
+- [x] 1.2 Agregar en `tests/test_end_to_end_notebook.py` los tests de auditoría estructural sobre `pipeline_observatorio_caba.ipynb`: JSON válido, compilación `ast.parse` de todas las celdas de código, existencia de >= 7 celdas Markdown con narrativa por paso, al menos 2 comentarios inline (`#`) por celda de código, cobertura de los 8 bloques gráficos de Defensa Ejecutiva, ausencia de secretos (`apify_api_`) y verificación de higiene git (`Datasets/`, `etl/output/` y 3 notebooks legados fuera de `git ls-files` y presentes en `.gitignore`). Validación: `pytest tests/test_end_to_end_notebook.py -k "notebook_structure or repo_hygiene"` (fallo esperado Red).
+- [x] 1.3 Actualizar `test_datasets_curados_folder_has_5_valid_csvs()` en `tests/test_etl_and_eda.py` para emitir `pytest.skip` cuando `Datasets/Curados/` no exista en un clone limpio, igualando el patrón de `test_producto1_outputs_exist_and_meet_contract()`. Validación: `pytest tests/test_etl_and_eda.py -v` (Exit Code `0`).
+
+## 2. Fase 2 · Implementación Core (`scripts/notebook_helpers.py`)
+
+- [x] 2.1 Implementar `ensure_runtime_dirs(base_dir)` y `select_ckan_resource` / `download_gcba_datasets` con selección defensiva de `.csv`/`.xlsx`, timeout explícito (`60s`), validación de columnas mínimas y discriminadores causales (`ERR_GCBA_DOWNLOAD`, `ERR_GCBA_SCHEMA`). Validación: `pytest tests/test_end_to_end_notebook.py -k "dirs or gcba" -v` (Exit Code `0`).
+- [x] 2.2 Implementar `fetch_zonaprop_apify(token, mode, max_items, output_path)` soportando `"last_run"` y `"run_new"` contra `memo23~zonaprop-scraper` con `waitForFinish=300`, validación de payload no vacío y tokens `ERR_MISSING_APIFY_TOKEN`, `ERR_INVALID_APIFY_MODE`, `ERR_APIFY_SCRAPER_FAILED`. Validación: `pytest tests/test_end_to_end_notebook.py -k "apify" -v` (Exit Code `0`).
+- [x] 2.3 Implementar `evaluate_baseline_vs_models` (`DummyRegressor`, `Ridge`, `RandomForestRegressor`, `XGBoost` dentro de `Pipeline` + `TransformedTargetRegressor` sin data leakage, guardrail `ERR_METRIC_REGRESSION`) y `compute_subgroup_error_audit` (MAE/MAPE por barrio y por cuartil de precio). Validación: `pytest tests/test_end_to_end_notebook.py -k "baseline or subgroup" -v` (Exit Code `0`).
+
+## 3. Fase 3 · Consumo Frontera (Notebook Maestro Comentado + Limpieza del Repositorio)
+
+- [x] 3.1 Construir `pipeline_observatorio_caba.ipynb` en la raíz del repositorio cubriendo Pasos 0 a 6 (Setup & carpetas dinámicas, Ingesta Live CKAN + Apify Scraper, ETL/NLP/Geo, EDA & VIF, K-Means + Baseline vs. XGBoost, Panel de 8 Gráficos de Defensa Ejecutiva e Inferencia + Score 0–100), con narrativa Markdown didáctica por paso y comentarios inline detallados en el 100% de las celdas de código. Validación: `pytest tests/test_end_to_end_notebook.py -k "notebook_structure" -v` (Exit Code `0`).
+- [x] 3.2 Actualizar `.gitignore` agregando `Datasets/` y `etl/output/`, remover del índice de git y del árbol local `Datasets/`, `etl/output/` y los 3 notebooks legados (`etl/etl_pipeline.ipynb`, `eda/eda_phase2.ipynb`, `mlops/inference.ipynb`), y actualizar referencias en `README.md`. Validación: `pytest tests/test_end_to_end_notebook.py -k "repo_hygiene" -v` (Exit Code `0`).
+
+## 4. Fase 4 · SVC Final y Evidencia (Exit Code 0)
+
+- [x] 4.1 Ejecutar la suite completa de regresión (`pytest -v`) en el repositorio limpio (sin `Datasets/` ni `etl/output/`), verificar `git ls-files Datasets/ etl/output/` vacío y generar el reporte `docs/evidence/evidence_end_to_end_notebook.md` con trazabilidad de todos los criterios Gherkin. Validación: `pytest -v && test -z "$(git ls-files Datasets/ etl/output/)"` (Exit Code `0`).

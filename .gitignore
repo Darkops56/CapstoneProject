@@ -189,6 +189,12 @@ apuntes/
 .matplotlib_cache/
 *.xlsx
 
+# Runtime datasets & ETL outputs (created dynamically by pipeline_observatorio_caba.ipynb)
+Datasets/
+etl/output/
+src/etl/output/
+**/etl/output/
+
 # Secrets, local environments & credentials
 secrets.toml
 .streamlit/secrets.toml

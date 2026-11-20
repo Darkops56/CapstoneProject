@@ -140,6 +140,7 @@ def main():
         median_price=active_median,
         pct_opportunities=active_opps,
         source_meta=source_meta,
+        crime_meta=norm_meta,
     )
 
     # Merge top controls and sidebar filters
@@ -180,11 +181,31 @@ def main():
             """
         st.markdown(legend_html, unsafe_allow_html=True)
 
+        show_crime_heatmap = bool(top_controls.get("show_crime_heatmap", False))
+        crime_metric = str(top_controls.get("crime_metric", "VOLUMEN"))
+
+        if show_crime_heatmap:
+            metric_label = "Volumen de delitos (500 m)" if crime_metric == "VOLUMEN" else "Gravedad ponderada de delitos (500 m)"
+            st.markdown(
+                f"""
+                <div data-testid="crime-heatmap-legend" style="display: flex; align-items: center; gap: 10px; font-size: 12px; margin-bottom: 8px; background: rgba(15, 23, 42, 0.9); padding: 6px 14px; border-radius: 8px; border: 1px solid #991b1b; width: fit-content; color: #f8fafc;">
+                    <span>🔥 <b>{metric_label}:</b></span>
+                    <span style="color: #cbd5e1;">Menor</span>
+                    <span style="display: inline-block; width: 96px; height: 10px; border-radius: 4px; background: linear-gradient(90deg, #fff5f0, #fcbba1, #fb6a4a, #de2d26, #a50f15);"></span>
+                    <span style="color: #fca5a5; font-weight: 600;">Mayor (p95+)</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
         deck = map_view.build_pydeck_chart(
             df=df_filtered,
             profile=top_controls["profile"],
             color_mode=top_controls["color_mode"],
             selected_listing_id=st.session_state["selected_listing_id"],
+            show_crime_heatmap=show_crime_heatmap,
+            crime_metric=crime_metric,
+            heatmap_df=clean_df,
         )
 
         # PyDeck WebGL Render container with fixed 650px height

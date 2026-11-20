@@ -75,8 +75,9 @@ def render_header_and_controls(
     median_price: float,
     pct_opportunities: float,
     source_meta: Dict[str, Any],
+    crime_meta: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Renders single-row top bar with profile selector, price checkboxes, color mode, and KPIs."""
+    """Renders top bar with profile selector, color mode, price checkboxes, crime heatmap toggle, and KPIs."""
     col_title, col_profile, col_color, col_price = st.columns([2.2, 1.8, 1.8, 4.2], gap="small")
 
     with col_title:
@@ -122,6 +123,46 @@ def render_header_and_controls(
         if cb_sobre:
             selected_statuses.append("SOBREPRECIO")
 
+    # Crime Heatmap Top Control Strip (uncompressed, full labels visible)
+    avail_metrics = (crime_meta or {}).get("available_crime_metrics", [])
+    crime_status = (crime_meta or {}).get("crime_heatmap_status", "INFO_CRIME_HEATMAP_UNAVAILABLE")
+    heatmap_disabled = len(avail_metrics) == 0
+
+    hm_col_toggle, hm_col_metric = st.columns([2.6, 7.4], gap="small")
+    with hm_col_toggle:
+        st.markdown('<div data-testid="crime-heatmap-toggle">', unsafe_allow_html=True)
+        show_crime_heatmap = st.toggle(
+            "🔥 Mapa de Calor: Delitos",
+            value=False,
+            disabled=heatmap_disabled,
+            key="show_crime_heatmap_toggle",
+        )
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    crime_metric = avail_metrics[0] if avail_metrics else "VOLUMEN"
+    with hm_col_metric:
+        if heatmap_disabled:
+            st.markdown(
+                f'<span data-testid="crime-heatmap-status" style="font-size: 12px; color: #94a3b8;">Capa delictiva no disponible ({crime_status})</span>',
+                unsafe_allow_html=True,
+            )
+        elif show_crime_heatmap:
+            if len(avail_metrics) > 1:
+                crime_metric = st.radio(
+                    "Métrica de Delitos",
+                    options=avail_metrics,
+                    format_func=lambda x: "Volumen (delitos 500m)" if x == "VOLUMEN" else "Gravedad ponderada (500m)",
+                    horizontal=True,
+                    label_visibility="collapsed",
+                    key="crime_metric_select",
+                )
+            else:
+                metric_lbl = "Volumen" if crime_metric == "VOLUMEN" else "Gravedad"
+                st.markdown(
+                    f'<span data-testid="crime-heatmap-status" style="font-size: 12px; color: #f59e0b;">Solo {metric_lbl} disponible ({crime_status})</span>',
+                    unsafe_allow_html=True,
+                )
+
     # KPI Strip
     kpi1, kpi2, kpi3 = st.columns(3)
     with kpi1:
@@ -137,6 +178,8 @@ def render_header_and_controls(
         "profile": profile,
         "color_mode": color_mode,
         "selected_price_statuses": selected_statuses,
+        "show_crime_heatmap": show_crime_heatmap,
+        "crime_metric": crime_metric,
     }
 
 

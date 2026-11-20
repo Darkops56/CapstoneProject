@@ -59,6 +59,46 @@ def classify_recommendation_color(recommendation: str) -> List[int]:
         return cfg.COLOR_EVALUAR
 
 
+def _normalize_p95_weight(series: pd.Series) -> pd.Series:
+    """Normalizes a numeric crime series to [0.0, 1.0] winsorized at the 95th percentile."""
+    vals = pd.to_numeric(series, errors="coerce").fillna(0.0).clip(lower=0.0).to_numpy(dtype=float)
+    if len(vals) == 0:
+        return pd.Series(dtype=float, index=series.index)
+    p95 = float(np.percentile(vals, 95))
+    if not np.isfinite(p95) or p95 <= 0.0:
+        return pd.Series(np.zeros(len(vals), dtype=float), index=series.index)
+    return pd.Series(np.clip(vals / p95, 0.0, 1.0), index=series.index)
+
+
+def compute_crime_weights(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+    """Pre-computes p95-winsorized crime heatmap weights and availability metadata."""
+    out = df.copy()
+    has_vol = "densidad_delitos_500m" in out.columns
+    has_grav = "indice_gravedad_delitos_500m" in out.columns
+
+    available_metrics: List[str] = []
+    if has_vol:
+        out["crime_weight_vol"] = _normalize_p95_weight(out["densidad_delitos_500m"])
+        available_metrics.append("VOLUMEN")
+    if has_grav:
+        out["crime_weight_grav"] = _normalize_p95_weight(out["indice_gravedad_delitos_500m"])
+        available_metrics.append("GRAVEDAD")
+
+    if has_vol and has_grav:
+        status = "INFO_CRIME_FULL_AVAILABLE"
+    elif has_vol:
+        status = "INFO_CRIME_GRAVITY_UNAVAILABLE"
+    elif has_grav:
+        status = "INFO_CRIME_VOLUME_UNAVAILABLE"
+    else:
+        status = "INFO_CRIME_HEATMAP_UNAVAILABLE"
+
+    return out, {
+        "crime_heatmap_status": status,
+        "available_crime_metrics": available_metrics,
+    }
+
+
 def normalize_schema(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     """Normalizes column names, checks required columns, filters CABA bbox,
     and pre-computes visual encoding columns (colors, radii, status tags).
@@ -159,7 +199,10 @@ def normalize_schema(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     out["radius_familia"] = 35.0 + (np.clip(out["score_familia"], 0.0, 100.0) / 100.0) * 75.0
     out["radius_soltero"] = 35.0 + (np.clip(out["score_soltero_ejecutivo"], 0.0, 100.0) / 100.0) * 75.0
 
-    # 6. Check Available Amenity Flags
+    # 6. Pre-compute Crime Heatmap Weights (cached inside normalize_schema)
+    out, crime_meta = compute_crime_weights(out)
+
+    # 7. Check Available Amenity Flags
     available_amenities = [col for col in GRANULAR_AMENITY_COLS if col in out.columns]
     amenities_status = (
         "INFO_FULL_AMENITIES_AVAILABLE" if len(available_amenities) > 0
@@ -175,6 +218,8 @@ def normalize_schema(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
         "audit_tag": "AUDIT_OUT_OF_BOUNDS_DROPPED" if dropped_count > 0 else "VALID_COORDS",
         "available_amenities": available_amenities,
         "amenities_status": amenities_status,
+        "crime_heatmap_status": crime_meta["crime_heatmap_status"],
+        "available_crime_metrics": crime_meta["available_crime_metrics"],
     }
 
     return out, meta

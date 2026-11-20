@@ -12,6 +12,9 @@ def build_pydeck_chart(
     profile: str = "FAMILIA",
     color_mode: str = "PRECIO",
     selected_listing_id: Optional[str] = None,
+    show_crime_heatmap: bool = False,
+    crime_metric: str = "VOLUMEN",
+    heatmap_df: Optional[pd.DataFrame] = None,
 ) -> pdk.Deck:
     """Builds a pydeck Deck object with ScatterplotLayer rendered over Carto Positron."""
     # Determine visual encoding attributes
@@ -78,21 +81,75 @@ def build_pydeck_chart(
         plot_df["desvio_fmt"] = plot_df["pct_sobreprecio"].apply(lambda x: f"{x:+.1f}%")
         plot_df["score_fmt"] = plot_df["active_score"].apply(lambda x: f"{x:.1f} / 100")
 
-    layer = pdk.Layer(
+    scatter_layer = pdk.Layer(
         "ScatterplotLayer",
+        id="ScatterplotLayer",
         data=plot_df,
         get_position=["longitud", "latitud"],
         get_fill_color=color_col,
         get_radius=radius_col,
         radius_min_pixels=4,
         radius_max_pixels=18,
+        stroked=True,
+        get_line_color=cfg.SCATTER_STROKE_COLOR,
+        line_width_min_pixels=1,
         pickable=True,
         auto_highlight=True,
         highlight_color=[255, 255, 255, 180],
     )
 
+    layers = []
+
+    if show_crime_heatmap:
+        hm_source = heatmap_df if (heatmap_df is not None and not heatmap_df.empty) else plot_df
+        if hm_source is not None and not hm_source.empty:
+            metric_upper = str(crime_metric).strip().upper()
+            preferred_col = "crime_weight_grav" if metric_upper == "GRAVEDAD" else "crime_weight_vol"
+            fallback_col = "crime_weight_vol" if preferred_col == "crime_weight_grav" else "crime_weight_grav"
+
+            weight_col = None
+            if preferred_col in hm_source.columns:
+                weight_col = preferred_col
+            elif fallback_col in hm_source.columns:
+                weight_col = fallback_col
+
+            if weight_col is not None and "longitud" in hm_source.columns and "latitud" in hm_source.columns:
+                hm_slim = pd.DataFrame({
+                    "longitud": pd.to_numeric(hm_source["longitud"], errors="coerce").round(5),
+                    "latitud": pd.to_numeric(hm_source["latitud"], errors="coerce").round(5),
+                    "weight": pd.to_numeric(hm_source[weight_col], errors="coerce").fillna(0.0).clip(0.0, 1.0).round(4),
+                }).dropna(subset=["longitud", "latitud"])
+
+                if len(hm_slim) > cfg.CRIME_HEATMAP_MAX_POINTS:
+                    hm_slim["lat_bin"] = hm_slim["latitud"].round(4)
+                    hm_slim["lon_bin"] = hm_slim["longitud"].round(4)
+                    hm_slim = (
+                        hm_slim.groupby(["lon_bin", "lat_bin"], as_index=False)["weight"]
+                        .mean()
+                        .rename(columns={"lon_bin": "longitud", "lat_bin": "latitud"})
+                    )
+                    hm_slim["weight"] = hm_slim["weight"].round(4)
+
+                if not hm_slim.empty:
+                    heatmap_layer = pdk.Layer(
+                        "HeatmapLayer",
+                        id="CrimeHeatmapLayer",
+                        data=hm_slim,
+                        get_position=["longitud", "latitud"],
+                        get_weight="weight",
+                        color_range=cfg.CRIME_HEATMAP_COLOR_RANGE,
+                        radius_pixels=cfg.CRIME_HEATMAP_RADIUS_PIXELS,
+                        intensity=cfg.CRIME_HEATMAP_INTENSITY,
+                        threshold=cfg.CRIME_HEATMAP_THRESHOLD,
+                        opacity=cfg.CRIME_HEATMAP_OPACITY,
+                        pickable=False,
+                    )
+                    layers.append(heatmap_layer)
+
+    layers.append(scatter_layer)
+
     deck = pdk.Deck(
-        layers=[layer],
+        layers=layers,
         initial_view_state=view_state,
         tooltip=tooltip,
         map_style=cfg.CARTO_POSITRON_STYLE,

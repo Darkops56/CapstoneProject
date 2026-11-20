@@ -27,3 +27,19 @@ COLOR_DESCARTAR = [239, 68, 68, 210]               # Red
 PAGE_SIZE = 12
 REQUEST_TIMEOUT_SECONDS = 10.0
 CARTO_POSITRON_STYLE = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
+
+# Crime HeatmapLayer WebGL parameters (ColorBrewer Reds progression)
+CRIME_HEATMAP_COLOR_RANGE = [
+    [255, 245, 240, 40],
+    [254, 224, 210, 110],
+    [252, 146, 114, 165],
+    [251, 106, 74, 200],
+    [222, 45, 38, 225],
+    [165, 15, 21, 245],
+]
+CRIME_HEATMAP_RADIUS_PIXELS = 55
+CRIME_HEATMAP_INTENSITY = 1.2
+CRIME_HEATMAP_THRESHOLD = 0.05
+CRIME_HEATMAP_OPACITY = 0.6
+CRIME_HEATMAP_MAX_POINTS = 2000
+SCATTER_STROKE_COLOR = [15, 23, 42, 210]

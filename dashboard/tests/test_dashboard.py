@@ -352,3 +352,122 @@ def test_filter_performance():
 
     assert len(filtered) > 0
     assert elapsed_ms < 50.0, f"Filter took {elapsed_ms:.2f}ms, exceeding 50ms requirement"
+
+
+# -------------------------------------------------------------------------
+# Crime Heatmap Layer & Graceful Degradation Tests (Negative-Path First)
+# -------------------------------------------------------------------------
+
+def _make_base_df(n: int = 40) -> pd.DataFrame:
+    np.random.seed(7)
+    return pd.DataFrame({
+        "listing_id": [str(i) for i in range(n)],
+        "latitud": np.linspace(-34.65, -34.55, n),
+        "longitud": np.linspace(-58.48, -58.38, n),
+        "costo_total_ars": np.linspace(500000.0, 1500000.0, n),
+        "precio_justo_ars": np.linspace(550000.0, 1400000.0, n),
+        "pct_sobreprecio": np.linspace(-10.0, 15.0, n),
+    })
+
+
+def test_crime_heatmap_full_available_and_p95_winsorization():
+    """When both volume and gravity columns exist, weights are in [0, 1] and top 5% saturate at 1.0."""
+    df = _make_base_df(100)
+    df["densidad_delitos_500m"] = np.concatenate([np.linspace(10.0, 900.0, 94), np.linspace(2000.0, 5000.0, 6)])
+    df["indice_gravedad_delitos_500m"] = np.concatenate([np.linspace(20.0, 1800.0, 94), np.linspace(4000.0, 9000.0, 6)])
+
+    clean_df, meta = norm.normalize_schema(df)
+    assert meta["crime_heatmap_status"] == "INFO_CRIME_FULL_AVAILABLE"
+    assert meta["available_crime_metrics"] == ["VOLUMEN", "GRAVEDAD"]
+    for col in ("crime_weight_vol", "crime_weight_grav"):
+        assert col in clean_df.columns
+        assert np.isfinite(clean_df[col]).all()
+        assert (clean_df[col] >= 0.0).all() and (clean_df[col] <= 1.0).all()
+        assert (clean_df[col] == 1.0).mean() >= 0.05
+
+
+def test_crime_heatmap_historical_csv_gravity_unavailable():
+    """Historical Drive CSV without indice_gravedad_delitos_500m degrades to INFO_CRIME_GRAVITY_UNAVAILABLE."""
+    df = _make_base_df(20)
+    df["densidad_delitos_500m"] = np.linspace(100.0, 1000.0, 20)
+
+    clean_df, meta = norm.normalize_schema(df)
+    assert meta["crime_heatmap_status"] == "INFO_CRIME_GRAVITY_UNAVAILABLE"
+    assert meta["available_crime_metrics"] == ["VOLUMEN"]
+    assert "crime_weight_vol" in clean_df.columns
+    assert (clean_df["crime_weight_vol"] >= 0.0).all() and (clean_df["crime_weight_vol"] <= 1.0).all()
+
+
+def test_crime_heatmap_both_columns_missing():
+    """CSV without any crime columns emits INFO_CRIME_HEATMAP_UNAVAILABLE without crashing."""
+    df = _make_base_df(10)
+    clean_df, meta = norm.normalize_schema(df)
+    assert meta["crime_heatmap_status"] == "INFO_CRIME_HEATMAP_UNAVAILABLE"
+    assert meta["available_crime_metrics"] == []
+    assert meta["status"] == "SCHEMA_VALID"
+
+
+def test_crime_heatmap_zero_nan_and_negative_division_guard():
+    """All zeros, NaNs, or negative/dirty strings must produce 0.0 weights without ZeroDivisionError."""
+    df = _make_base_df(10)
+    df["densidad_delitos_500m"] = [0.0, np.nan, -50.0, "N/A", 0.0, np.nan, 0.0, 0.0, -1.0, 0.0]
+
+    clean_df, meta = norm.normalize_schema(df)
+    assert meta["status"] == "SCHEMA_VALID"
+    assert np.isfinite(clean_df["crime_weight_vol"]).all()
+    assert (clean_df["crime_weight_vol"] == 0.0).all()
+
+
+def test_crime_heatmap_pydeck_layers_slim_payload_and_fallback():
+    """Verify OFF=1 layer, ON=2 layers [HeatmapLayer, ScatterplotLayer], 3-col slim payload <= 250KB, and fallback."""
+    clean_raw = _make_base_df(964)
+    clean_raw["densidad_delitos_500m"] = np.linspace(50.0, 2500.0, 964)
+    clean_raw["indice_gravedad_delitos_500m"] = np.linspace(100.0, 6000.0, 964)
+    # Add extra columns to ensure slim projection does NOT serialize them
+    for extra_i in range(25):
+        clean_raw[f"extra_col_{extra_i}"] = "long_metadata_payload_value_for_test"
+
+    clean_df, _ = norm.normalize_schema(clean_raw)
+    df_filtered = clean_df.head(10).copy()
+
+    # 1. Default OFF: 1 layer (ScatterplotLayer)
+    deck_off = map_view.build_pydeck_chart(df=df_filtered, show_crime_heatmap=False)
+    assert len(deck_off.layers) == 1
+    assert deck_off.layers[0].type == "ScatterplotLayer"
+
+    # 2. ON with VOLUMEN and heatmap_df=clean_df
+    deck_on = map_view.build_pydeck_chart(
+        df=df_filtered,
+        show_crime_heatmap=True,
+        crime_metric="VOLUMEN",
+        heatmap_df=clean_df,
+    )
+    assert len(deck_on.layers) == 2
+    hm_layer, sc_layer = deck_on.layers[0], deck_on.layers[1]
+    assert hm_layer.type == "HeatmapLayer"
+    assert hm_layer.pickable is False
+    assert isinstance(hm_layer.data, list)
+    assert len(hm_layer.data) == 964
+    assert set(hm_layer.data[0].keys()) == {"longitud", "latitud", "weight"}
+    assert hm_layer.color_range[-1][0] >= 160
+
+    assert sc_layer.type == "ScatterplotLayer"
+    assert sc_layer.id == "ScatterplotLayer"
+    assert sc_layer.pickable is True
+    assert sc_layer.stroked is True
+
+    # Slim JSON payload check for HeatmapLayer alone <= 250 KB
+    hm_json_kb = len(map_view.pdk.Deck(layers=[hm_layer]).to_json()) / 1024.0
+    assert hm_json_kb <= 250.0, f"HeatmapLayer JSON payload {hm_json_kb:.1f} KB exceeded 250 KB"
+
+    # 3. Fallback when GRAVEDAD requested on historical CSV without crime_weight_grav
+    hist_df = clean_df.drop(columns=["crime_weight_grav", "indice_gravedad_delitos_500m"])
+    deck_fallback = map_view.build_pydeck_chart(
+        df=df_filtered,
+        show_crime_heatmap=True,
+        crime_metric="GRAVEDAD",
+        heatmap_df=hist_df,
+    )
+    assert len(deck_fallback.layers) == 2
+    assert deck_fallback.layers[0].type == "HeatmapLayer"
+

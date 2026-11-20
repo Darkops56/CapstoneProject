@@ -7,6 +7,8 @@ from mlops.registry import (
     DEFAULT_MIN_R2,
     MetricRegressionError,
     bump_version,
+    compute_dataset_hash,
+    deduplicate_annual_dataset,
     extract_r2_metric,
     get_next_version_str,
     load_registry,
@@ -139,3 +141,90 @@ def test_bump_version_metric_regression_guard(temp_registry_env):
     current_reg = load_registry(reg_file)
     assert current_reg["production_version"] == "v1"
     assert "v2" not in current_reg["versions"]
+
+
+def test_dataset_hash_idempotency_skips_bump(temp_registry_env):
+    """Verifica que si el dataset tiene el mismo hash SHA-256 que producción, se emite SKIP_IDENTICAL_DATASET sin incrementar versión."""
+    import pandas as pd
+
+    reg_file = temp_registry_env["reg_file"]
+    src_dir = temp_registry_env["artifacts_src"]
+    target_dir = temp_registry_env["target_artifacts"]
+
+    df_sample = pd.DataFrame({
+        "calle_normalizada": ["av santa fe 1200", "av cabildo 2100"],
+        "m2_cubiertos": [45.0, 60.0],
+        "ambientes": [2, 3],
+        "costo_total_ars": [500000.0, 750000.0],
+    })
+    ds_hash = compute_dataset_hash(df_sample)
+    assert isinstance(ds_hash, str) and len(ds_hash) == 64
+
+    # Primer bump: registra v1 con dataset_hash
+    res_v1 = bump_version(
+        metrics={"r2": 0.85},
+        artifacts_src_dir=src_dir,
+        target_artifacts_base=target_dir,
+        registry_path=reg_file,
+        dataset_hash=ds_hash,
+    )
+    assert res_v1["version"] == "v1"
+    assert res_v1["dataset_hash"] == ds_hash
+
+    # Segundo bump con el MISMO dataset_hash: debe omitirse idempotentemente
+    res_dup = bump_version(
+        metrics={"r2": 0.85},
+        artifacts_src_dir=src_dir,
+        target_artifacts_base=target_dir,
+        registry_path=reg_file,
+        dataset_hash=ds_hash,
+    )
+    assert res_dup["status"] == "SKIP_IDENTICAL_DATASET"
+    assert res_dup["version"] == "v1"
+    assert not (target_dir / "v2").exists()
+
+
+def test_deduplicate_annual_dataset_natural_key():
+    """Verifica que el acumulador anual deduplica por (calle_normalizada, m2_cubiertos, ambientes) conservando la última observación."""
+    import pandas as pd
+
+    df_raw = pd.DataFrame({
+        "calle_normalizada": ["av santa fe 1200", "av santa fe 1200", "av cabildo 2100"],
+        "m2_cubiertos": [45.0, 45.0, 60.0],
+        "ambientes": [2, 2, 3],
+        "costo_total_ars": [450000.0, 520000.0, 750000.0],
+        "mes": ["2026-01", "2026-10", "2026-05"],
+    })
+    df_dedup = deduplicate_annual_dataset(df_raw)
+    assert len(df_dedup) == 2
+    santa_fe = df_dedup[df_dedup["calle_normalizada"] == "av santa fe 1200"].iloc[0]
+    assert santa_fe["costo_total_ars"] == 520000.0
+    assert santa_fe["mes"] == "2026-10"
+
+
+def test_shap_background_and_atomic_exporter(temp_registry_env):
+    """Verifica el subsampling acotado de SHAP (N<=100) y el exportador atómico en modo dry_run."""
+    import numpy as np
+    import pandas as pd
+    from trainer.src.train_pipeline import compute_shap_background
+    from trainer.src.gdrive_exporter import export_version_to_gdrive_atomic
+
+    X_large = pd.DataFrame(np.random.randn(250, 4), columns=["a", "b", "c", "d"])
+    bg = compute_shap_background(X_large, max_samples=100)
+    assert len(bg) == 100
+
+    X_small = pd.DataFrame(np.random.randn(40, 4), columns=["a", "b", "c", "d"])
+    bg_small = compute_shap_background(X_small, max_samples=100)
+    assert len(bg_small) == 40
+
+    res = export_version_to_gdrive_atomic(
+        credentials_info=None,
+        registry_folder_id="",
+        artifacts_dir=temp_registry_env["artifacts_src"],
+        metrics={"r2": 0.86},
+        dataset_hash="a" * 64,
+        dry_run=True,
+    )
+    assert res["status"] == "dry_run"
+    assert res["atomic_staging"] is True
+    assert res["manifest"]["versions"]["v1"]["dataset_hash"] == "a" * 64

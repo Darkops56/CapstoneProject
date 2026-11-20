@@ -218,3 +218,104 @@ def export_version_to_gdrive(
         "manifest_file_id": manifest_file_id,
         "manifest": manifest,
     }
+
+
+def export_version_to_gdrive_atomic(
+    credentials_info: dict[str, Any] | str | None,
+    registry_folder_id: str,
+    artifacts_dir: Path,
+    metrics: dict[str, Any],
+    dataset_hash: str | None = None,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Exporta binarios a staging_v(N+1)/, valida integridad y renombra atómicamente antes de actualizar el manifiesto."""
+    joblib_files = sorted(artifacts_dir.glob("*.joblib"))
+    if not joblib_files:
+        raise ValueError(f"ERR_NO_ARTIFACTS: No se encontraron archivos .joblib en {artifacts_dir}")
+
+    if dry_run or not registry_folder_id:
+        next_v = "v1"
+        version_entry: dict[str, Any] = {
+            "version": next_v,
+            "registered_at": datetime.now(timezone.utc).isoformat(),
+            "metrics": metrics,
+            "status": "production",
+        }
+        if dataset_hash:
+            version_entry["dataset_hash"] = dataset_hash
+        return {
+            "status": "dry_run",
+            "atomic_staging": True,
+            "version": next_v,
+            "uploaded_files": [f.name for f in joblib_files],
+            "manifest": {
+                "production_version": next_v,
+                "latest_version": next_v,
+                "versions": {next_v: version_entry},
+            },
+        }
+
+    drive_service = get_drive_service(credentials_info)
+
+    # 1. Obtener manifiesto actual y verificar idempotencia por dataset_hash
+    manifest = get_manifest_from_drive(drive_service, registry_folder_id)
+    prod_v = manifest.get("production_version")
+    prod_info = manifest.get("versions", {}).get(prod_v) if prod_v else None
+    if dataset_hash and isinstance(prod_info, dict) and prod_info.get("dataset_hash") == dataset_hash:
+        return {
+            "status": "SKIP_IDENTICAL_DATASET",
+            "atomic_staging": True,
+            "version": prod_v,
+            "manifest": manifest,
+        }
+
+    next_version = get_next_manifest_version(manifest)
+    staging_name = f"staging_{next_version}"
+
+    # 2. Fase 1 Atómica: subir binarios a staging_v(N+1)/
+    staging_folder_id = get_or_create_subfolder(drive_service, registry_folder_id, staging_name)
+    uploaded_files: dict[str, str] = {}
+    for joblib_file in joblib_files:
+        fid = upload_or_update_file(drive_service, staging_folder_id, joblib_file)
+        if not fid:
+            raise IOError(f"ERR_ATOMIC_UPLOAD_FAILED: Falló la subida de {joblib_file.name}")
+        uploaded_files[joblib_file.name] = fid
+
+    # 3. Fase 2 Atómica: renombrar staging_v(N+1) -> v(N+1) tras validar integridad completa
+    drive_service.files().update(
+        fileId=staging_folder_id,
+        body={"name": next_version},
+        fields="id, name",
+    ).execute()
+
+    # 4. Actualizar estado en el manifiesto
+    for v_key, v_val in manifest.get("versions", {}).items():
+        if isinstance(v_val, dict):
+            v_val["status"] = "archived"
+
+    version_record: dict[str, Any] = {
+        "version": next_version,
+        "folder_id": staging_folder_id,
+        "registered_at": datetime.now(timezone.utc).isoformat(),
+        "metrics": metrics,
+        "artifacts": uploaded_files,
+        "status": "production",
+    }
+    if dataset_hash:
+        version_record["dataset_hash"] = dataset_hash
+
+    manifest["versions"][next_version] = version_record
+    manifest["production_version"] = next_version
+    manifest["latest_version"] = next_version
+
+    # 5. Persistir manifiesto actualizado en Drive
+    manifest_file_id = save_manifest_to_drive(drive_service, registry_folder_id, manifest)
+
+    return {
+        "status": "success",
+        "atomic_staging": True,
+        "version": next_version,
+        "version_folder_id": staging_folder_id,
+        "manifest_file_id": manifest_file_id,
+        "manifest": manifest,
+    }

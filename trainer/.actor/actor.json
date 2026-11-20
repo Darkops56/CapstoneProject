@@ -1,7 +1,7 @@
 {
   "actorSpecification": 1,
   "name": "mlops-annual-trainer",
-  "title": "MLOps Annual Retraining Actor (XGBoost + KMeans & Drive Registry)",
+  "title": "MLOps Annual Retraining Actor (XGBoost, KMeans & Drive)",
   "description": "Actor serverless para reentrenamiento anual de modelos de precios y habitabilidad CABA, validación de métricas de calidad (R2 >= 0.80) y exportación versionada a Google Drive.",
   "version": "1.0",
   "dockerfile": "../Dockerfile",

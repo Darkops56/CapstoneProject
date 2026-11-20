@@ -102,9 +102,11 @@ En tu unidad de [Google Drive](https://drive.google.com/), estructura las siguie
    - Almacena los archivos mensuales `alquileres_caba_enriquecido_YYYY_MM.csv` consumidos por el dashboard de Streamlit.
    - Aplica la política de retención para conservar únicamente los 3 datasets más recientes.
 2. **`02_anual_gcba_raw`** (ej. ID: `1HFbHhTxwNWq4rdTY2EIAjNme9xnTlZx2`):
-   - Almacena los archivos raw oficiales anuales del GCBA (`delitos_gcba_anual_YYYY.csv`).
+   - Almacena los 4 datasets oficiales anuales auditados vía CKAN API del GCBA: `delitos`, `bocas-subte`, `mapa-ruido` y `establecimientos-educativos` (`<filePrefix>_YYYY.<ext>`).
 3. **`03_model_registry`**:
-   - Almacena las subcarpetas versionadas de modelos (`v1/`, `v2/`, etc.) y el manifiesto global `models_manifest.json`.
+   - Almacena las subcarpetas versionadas de modelos (`v1/`, `v2/`, etc.) mediante escritura atómica (`staging_v(N+1)/`) y el manifiesto global `models_manifest.json`.
+4. **`04_historico_alquileres_anual`**:
+   - Acumulador anual inmutable con los 12 meses de publicaciones enriquecidas (exento de la purga trimestral de `01_mensual_enriquecido`), deduplicado por clave natural `(calle_normalizada, m2_cubiertos, ambientes)` para alimentar al Actor Trainer.
 
 ---
 
@@ -144,6 +146,9 @@ En tu unidad de [Google Drive](https://drive.google.com/), estructura las siguie
 | **Google Drive: Listar Archivos 01_mensual_enriquecido** | Resource / Operation | **Resource:** `File/Folder`<br>**Operation:** `Search`<br>**Search Method:** `Advanced Search` (valor interno en JSON: `query`)<br>**Query String:** `'10bpShYlE_FSzUtW3xNz5jH0BGbRGF4yo' in parents and trashed = false and mimeType = 'text/csv'`<br>**Return All:** `true` |
 | **Retención: Filtrar Archivos > 3 Meses** | Code Node (JS) | Ordena por fecha descendente y retorna excedentes a purgar (`items.slice(3)`) si `length > 3`. |
 | **Google Drive: Purgar Excedente a Papelera** | Resource / Operation | **Resource:** `File`<br>**Operation:** `Delete`<br>**File ID:** `={{ $json.fileId }}`<br>**Delete Permanently:** `false` (envía a papelera defensivamente) |
+| **Google Drive: Acumular en Histórico Anual** | Resource / Operation | Folder: `04_historico_alquileres_anual`, Name: `=alquileres_caba_historico_{{ $now.format('yyyy_MM') }}.csv` (retención dual inmutable) |
+| **CKAN API: Consultar Delitos CABA** | Resiliencia | `Continue on Fail: true`, `timeout: 30000ms`. Si falla, emite `WARN_GCBA_UNAVAILABLE` y converge al reentrenamiento anual. |
+| **Apify: Actor Trainer** | URL & Timeout | `POST https://api.apify.com/v2/acts/TU_USUARIO~mlops-annual-trainer/runs?waitForFinish=360`, `timeout: 360000ms`, Auth: `Apify Header Auth` |
 
 ---
 
@@ -171,3 +176,5 @@ En tu unidad de [Google Drive](https://drive.google.com/), estructura las siguie
 | `ForbiddenError: Insufficient permissions for the dataset (exit code 91)` | El Actor de Apify tiene permisos limitados y no puede leer datasets de otros actores. | En Apify Console > Actor `zonaprop-curator-inference` > Settings > Access & Permissions: seleccionar **`Full permissions`**. |
 | Drive: `expects binary file 'data', but none was found` | El nodo HTTP de descarga no especificó el formato de archivo. | En el nodo HTTP de descarga, ir a `Options` > `Response` > `Response Format` y seleccionar **`File`**. |
 | `ERR_METRIC_REGRESSION` en el Actor Trainer | El modelo reentrenado obtuvo un $R^2 < 0.80$ y abortó para proteger producción. | Verificar calidad y volumen de datos en el CSV de reentrenamiento. El registry anterior permanece intacto. |
+| `WARN_GCBA_UNAVAILABLE` en el flujo anual | La API CKAN de GCBA no respondió dentro de 30s o retornó HTTP 5xx. | Comportamiento resiliente esperado: n8n continúa hacia `Apify: Actor Trainer` conservando el árbol de delitos vigente. |
+| `SKIP_IDENTICAL_DATASET` en el Registry | El hash SHA-256 del dataset anual coincide con la versión en producción. | Comportamiento idempotente esperado: se omite el bump duplicado de versión sin alterar producción. |

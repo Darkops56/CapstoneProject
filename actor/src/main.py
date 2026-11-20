@@ -21,7 +21,10 @@ except ImportError:
     HAS_APIFY = False
 
 
-def run_pipeline(input_data: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def run_pipeline(
+    input_data: list[dict[str, Any]],
+    artifacts_dir: Path | str | None = None,
+) -> list[dict[str, Any]]:
     """Ejecuta el pipeline completo de curación, cruce geoespacial e inferencia."""
     if not input_data:
         return []
@@ -30,10 +33,36 @@ def run_pipeline(input_data: list[dict[str, Any]]) -> list[dict[str, Any]]:
     df_curated = pipeline.curate_and_enrich(input_data)
     print(f"[Actor] Curación y cruce geoespacial completados ({len(df_curated)} registros)")
 
-    df_scored = pipeline.predict_and_score(df_curated)
+    df_scored = pipeline.predict_and_score(df_curated, artifacts_dir=artifacts_dir)
     print(f"[Actor] Inferencia y cálculo de scores finalizados exitosamente")
 
     return df_scored.to_dict(orient="records")
+
+
+async def _resolve_dynamic_models(actor_input: dict[str, Any]) -> Path | None:
+    """Descarga modelos actualizados desde un Key-Value Store de Apify si se indica en el input."""
+    store_name = actor_input.get("modelStoreName")
+    store_id = actor_input.get("modelKvStoreId")
+    if not store_name and not store_id:
+        return None
+
+    required_files = ("kmeans_model.joblib", "xgb_price_model.joblib", "model_metadata.joblib")
+    target_dir = Path("/tmp/dynamic_models")
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        kv_store = await Actor.open_key_value_store(name=store_name) if store_name else await Actor.open_key_value_store(id=store_id)
+        for fname in required_files:
+            content = await kv_store.get_value(fname)
+            if not content or not isinstance(content, (bytes, bytearray)):
+                print(f"[Actor] WARN: Falta '{fname}' en KV Store ({store_name or store_id}); usando fallback local.")
+                return None
+            (target_dir / fname).write_bytes(bytes(content))
+        print(f"[Actor] Modelos dinámicos cargados desde Apify KV Store: {store_name or store_id}")
+        return target_dir
+    except Exception as exc:
+        print(f"[Actor] WARN: Error leyendo KV Store ({store_name or store_id}): {exc}. Usando fallback local.")
+        return None
 
 
 async def _run_apify_mode() -> None:
@@ -64,7 +93,8 @@ async def _run_apify_mode() -> None:
         if limit and len(raw_items) > limit:
             raw_items = raw_items[:limit]
 
-        results = run_pipeline(raw_items)
+        dynamic_models_dir = await _resolve_dynamic_models(actor_input)
+        results = run_pipeline(raw_items, artifacts_dir=dynamic_models_dir)
 
         print(f"[Actor] Guardando {len(results)} registros en el dataset por defecto de Apify...")
         await Actor.push_data(results)

@@ -25,36 +25,60 @@ except ImportError:
 
 def load_dataset_from_input(actor_input: dict[str, Any]) -> pd.DataFrame:
     """Extrae o descarga el DataFrame de entrenamiento a partir del input."""
+    df: pd.DataFrame | None = None
+
     # 1. Si se proveyó un array JSON en 'trainingData'
     raw_data = actor_input.get("trainingData")
     if raw_data and isinstance(raw_data, list):
-        return pd.DataFrame(raw_data)
+        df = pd.DataFrame(raw_data)
 
-    # 2. Si se proveyó una URL a un CSV en 'trainingDataCsvUrl'
-    csv_url = actor_input.get("trainingDataCsvUrl")
-    if csv_url:
-        print(f"[Trainer] Descargando dataset desde URL: {csv_url}")
-        resp = requests.get(csv_url, timeout=60)
-        resp.raise_for_status()
-        return pd.read_csv(io.StringIO(resp.text))
+    # 2. Si se proveyó texto CSV (string o lista de strings CSV desde n8n/Drive)
+    if df is None:
+        csv_text = actor_input.get("trainingDataCsvText")
+        if isinstance(csv_text, str) and csv_text.strip():
+            df = pd.read_csv(io.StringIO(csv_text))
+        elif isinstance(csv_text, list) and csv_text:
+            frames = [pd.read_csv(io.StringIO(t)) for t in csv_text if isinstance(t, str) and t.strip()]
+            if frames:
+                df = pd.concat(frames, ignore_index=True)
 
-    # 3. Si se especificó una ruta local en 'dataPath'
-    data_path = actor_input.get("dataPath")
-    if data_path and os.path.exists(data_path):
-        return pd.read_csv(data_path)
+    # 3. Si se proveyó una URL a un CSV en 'trainingDataCsvUrl'
+    if df is None:
+        csv_url = actor_input.get("trainingDataCsvUrl")
+        if csv_url:
+            print(f"[Trainer] Descargando dataset desde URL: {csv_url}")
+            resp = requests.get(csv_url, timeout=60)
+            resp.raise_for_status()
+            df = pd.read_csv(io.StringIO(resp.text))
 
-    # 4. Fallback al archivo curado local del repo si existe
-    default_candidates = [
-        Path("etl/output/curated_caba_dataset.csv"),
-        Path("../etl/output/curated_caba_dataset.csv"),
-        Path("/usr/src/app/etl/output/curated_caba_dataset.csv"),
-    ]
-    for cand in default_candidates:
-        if cand.exists():
-            print(f"[Trainer] Usando dataset local predeterminado: {cand}")
-            return pd.read_csv(cand)
+    # 4. Si se especificó una ruta local en 'dataPath'
+    if df is None:
+        data_path = actor_input.get("dataPath")
+        if data_path and os.path.exists(data_path):
+            df = pd.read_csv(data_path)
 
-    raise ValueError("ERR_NO_DATA: No se encontró ningún dataset válido en el input ni en el entorno local.")
+    # 5. Fallback al archivo curado local del repo si existe
+    if df is None:
+        default_candidates = [
+            Path("etl/output/curated_caba_dataset.csv"),
+            Path("../etl/output/curated_caba_dataset.csv"),
+            Path("/usr/src/app/etl/output/curated_caba_dataset.csv"),
+        ]
+        for cand in default_candidates:
+            if cand.exists():
+                print(f"[Trainer] Usando dataset local predeterminado: {cand}")
+                df = pd.read_csv(cand)
+                break
+
+    if df is None or df.empty:
+        raise ValueError("ERR_NO_DATA: No se encontró ningún dataset válido en el input ni en el entorno local.")
+
+    # Deduplicación por clave natural si están disponibles las columnas
+    natural_keys = [c for c in ("calle_normalizada", "m2_cubiertos", "ambientes") if c in df.columns]
+    if natural_keys:
+        df = df.drop_duplicates(subset=natural_keys, keep="last").reset_index(drop=True)
+
+    return df
 
 
 async def _run_apify_mode() -> None:
@@ -88,23 +112,57 @@ async def _run_apify_mode() -> None:
             )
             print(f"[Trainer] Entrenamiento exitoso. R2 obtenido: {train_results['metrics']['r2']}")
 
-            # Exportación a Google Drive
+            # 1. Publicar binarios y manifiesto en el Key-Value Store de Apify (consumo directo por n8n OAuth2)
+            from datetime import datetime, timezone
+
+            kv_artifacts: list[str] = []
+            for artifact_name in ("kmeans_model.joblib", "xgb_price_model.joblib", "model_metadata.joblib"):
+                artifact_path = artifacts_dir / artifact_name
+                if artifact_path.exists():
+                    await Actor.set_value(
+                        artifact_name,
+                        artifact_path.read_bytes(),
+                        content_type="application/octet-stream",
+                    )
+                    kv_artifacts.append(artifact_name)
+
+            manifest_payload = {
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "sample_count": train_results["sample_count"],
+                "dataset_hash": train_results.get("dataset_hash"),
+                "metrics": train_results["metrics"],
+                "artifacts": kv_artifacts,
+                "status": "production",
+            }
+            await Actor.set_value("models_manifest.json", manifest_payload, content_type="application/json")
+            kv_artifacts.append("models_manifest.json")
+            print(f"[Trainer] Artefactos publicados en Apify Key-Value Store: {kv_artifacts}")
+
+            # 2. Exportación directa a Google Drive solo si se proveen credenciales de Service Account
             export_result = {}
-            if gdrive_folder_id:
+            has_sa_creds = bool(
+                gdrive_creds
+                or os.environ.get("GDRIVE_SERVICE_ACCOUNT_JSON")
+                or os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+            )
+            if gdrive_folder_id and has_sa_creds:
                 print(f"[Trainer] Exportando artefactos a Google Drive folder: {gdrive_folder_id}...")
-                export_result = gdrive_exporter.export_version_to_gdrive(
+                export_result = gdrive_exporter.export_version_to_gdrive_atomic(
                     credentials_info=gdrive_creds,
                     registry_folder_id=gdrive_folder_id,
                     artifacts_dir=artifacts_dir,
                     metrics=train_results["metrics"],
+                    dataset_hash=train_results.get("dataset_hash"),
                     dry_run=False,
                 )
                 print(f"[Trainer] Versión {export_result.get('version')} exportada a Google Drive con éxito.")
             else:
-                print("[Trainer] INFO: gdriveFolderId no especificado. Omitiendo subida a Drive.")
+                print("[Trainer] INFO: Sin Service Account configurada; artefactos disponibles en Apify KV Store para n8n.")
 
             final_output = {
                 "status": "success",
+                "kv_artifacts": kv_artifacts,
+                "manifest": manifest_payload,
                 "training_results": train_results,
                 "drive_export": export_result,
             }

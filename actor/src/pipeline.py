@@ -192,9 +192,13 @@ def curate_and_enrich(properties_raw: list[dict[str, Any]]) -> pd.DataFrame:
     return df
 
 
-def predict_and_score(df_curated: pd.DataFrame) -> pd.DataFrame:
+def predict_and_score(
+    df_curated: pd.DataFrame,
+    artifacts_dir: Path | str | None = None,
+) -> pd.DataFrame:
     """Ejecuta los modelos K-Means y XGBoost y calcula los scores de decisión."""
-    artifacts = scoring.load_artifacts(ARTIFACTS_DIR)
+    resolved_dir = Path(artifacts_dir) if artifacts_dir else ARTIFACTS_DIR
+    artifacts = scoring.load_artifacts(resolved_dir)
     meta = artifacts["metadata"]
     reg_features = meta["regression_features"]
     cluster_features = meta["cluster_features"]

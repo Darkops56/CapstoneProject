@@ -7,7 +7,7 @@
           "interval": [
             {
               "field": "cronExpression",
-              "expression": "0 0 3 1 1 1"
+              "expression": "0 4 1 3 *"
             }
           ]
         }
@@ -23,13 +23,12 @@
     },
     {
       "parameters": {
-        "url": "https://data.buenosaires.gob.ar/api/3/action/package_show?id=delitos",
-        "options": {}
+        "jsCode": "return [\n  { json: { datasetId: \"delitos\", filePrefix: \"delitos_gcba_anual\" } },\n  { json: { datasetId: \"bocas-subte\", filePrefix: \"bocas_subte_gcba_anual\" } },\n  { json: { datasetId: \"mapa-ruido\", filePrefix: \"mapa_ruido_gcba_anual\" } },\n  { json: { datasetId: \"establecimientos-educativos\", filePrefix: \"establecimientos_educativos_gcba_anual\" } }\n];"
       },
-      "id": "c5d27351-8297-4bc7-aec0-9d87bcdd50b8",
-      "name": "CKAN API: Consultar Delitos CABA",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "id": "d1e2f3a4-5b6c-4d7e-8f9a-0b1c2d3e4f5a",
+      "name": "Definir Catálogo Datasets GCBA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         224,
         -112
@@ -37,14 +36,32 @@
     },
     {
       "parameters": {
-        "jsCode": "const result = $input.first().json.result || {};\nconst metadataModified = result.metadata_modified || '';\nconst resources = result.resources || [];\n\n// Idempotencia contra $getWorkflowStaticData()\nconst staticData = $getWorkflowStaticData('global');\nconst lastModified = staticData.lastModified || '';\n\nconst hasUpdate = Boolean(metadataModified && metadataModified !== lastModified);\n\n// Filtrar último archivo CSV o XLSX publicado\nconst latestResource = resources.find(r => r.format?.toLowerCase() === 'csv' || r.format?.toLowerCase() === 'xlsx') || resources[0];\n\nif (hasUpdate) {\n  staticData.lastModified = metadataModified;\n}\n\nreturn [{\n  json: {\n    datasetTitle: result.title,\n    metadataModified: metadataModified,\n    lastModified: lastModified,\n    hasUpdate: hasUpdate,\n    downloadUrl: latestResource?.url || '',\n    resourceFormat: latestResource?.format || 'csv',\n    resourceName: latestResource?.name || 'delitos_actualizado',\n    eventToken: hasUpdate ? 'EVENT_GCBA_DATA_UPDATED' : 'SKIP_NO_ANNUAL_UPDATE'\n  }\n}];"
+        "url": "=https://data.buenosaires.gob.ar/api/3/action/package_show?id={{ $json.datasetId }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "c5d27351-8297-4bc7-aec0-9d87bcdd50b8",
+      "name": "CKAN API: Consultar Datasets GCBA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "continueOnFail": true,
+      "onError": "continueRegularOutput",
+      "position": [
+        448,
+        -112
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const catalog = $(\"Definir Catálogo Datasets GCBA\").all();\nconst responses = $input.all();\nconst staticData = $getWorkflowStaticData(\"global\");\nstaticData.lastModifiedByDataset = staticData.lastModifiedByDataset || {};\n\nreturn responses.map((item, idx) => {\n  const meta = catalog[idx]?.json || { datasetId: \"unknown\", filePrefix: \"gcba_anual\" };\n  const raw = item.json || {};\n  if (raw.error || !raw.result) {\n    return {\n      json: {\n        datasetId: meta.datasetId,\n        filePrefix: meta.filePrefix,\n        datasetTitle: meta.datasetId,\n        metadataModified: \"\",\n        lastModified: staticData.lastModifiedByDataset[meta.datasetId] || \"\",\n        hasUpdate: false,\n        downloadUrl: \"\",\n        resourceFormat: \"csv\",\n        resourceName: `${meta.datasetId}_unavailable`,\n        gcbaStatus: \"WARN_GCBA_UNAVAILABLE\",\n        eventToken: \"WARN_GCBA_UNAVAILABLE\"\n      }\n    };\n  }\n  const result = raw.result;\n  const metadataModified = result.metadata_modified || \"\";\n  const resources = result.resources || [];\n  const lastModified = staticData.lastModifiedByDataset[meta.datasetId] || \"\";\n  const hasUpdate = Boolean(metadataModified && metadataModified !== lastModified);\n  const latestResource = resources.find(r => r.format?.toLowerCase() === \"csv\" || r.format?.toLowerCase() === \"xlsx\") || resources[0];\n  if (hasUpdate) {\n    staticData.lastModifiedByDataset[meta.datasetId] = metadataModified;\n  }\n  return {\n    json: {\n      datasetId: meta.datasetId,\n      filePrefix: meta.filePrefix,\n      datasetTitle: result.title || meta.datasetId,\n      metadataModified,\n      lastModified,\n      hasUpdate,\n      downloadUrl: latestResource?.url || \"\",\n      resourceFormat: latestResource?.format || \"csv\",\n      resourceName: latestResource?.name || `${meta.datasetId}_actualizado`,\n      gcbaStatus: hasUpdate ? \"EVENT_GCBA_DATA_UPDATED\" : \"SKIP_NO_ANNUAL_UPDATE\",\n      eventToken: hasUpdate ? \"EVENT_GCBA_DATA_UPDATED\" : \"SKIP_NO_ANNUAL_UPDATE\"\n    }\n  };\n});"
       },
       "id": "0856f7f0-e7f3-401f-8519-1d332e4247a4",
       "name": "Evaluar Metadatos & URL Descarga",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        448,
+        672,
         -112
       ]
     },
@@ -72,27 +89,36 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        656,
+        896,
         -112
       ]
     },
     {
       "parameters": {
         "url": "={{ $json.downloadUrl }}",
-        "options": {}
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
       },
       "id": "abd336af-bdec-4eb5-94da-b71586c4810c",
       "name": "Descargar Dataset GCBA",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
+      "continueOnFail": true,
+      "onError": "continueRegularOutput",
       "position": [
-        880,
+        1120,
         -192
       ]
     },
     {
       "parameters": {
-        "name": "=delitos_gcba_anual_{{ $now.format('yyyy') }}.{{ $('Evaluar Metadatos & URL Descarga').item.json.resourceFormat.toLowerCase() }}",
+        "name": "={{ $(\"Evaluar Metadatos & URL Descarga\").item.json.filePrefix }}_{{ $now.format(\"yyyy\") }}.{{ $(\"Evaluar Metadatos & URL Descarga\").item.json.resourceFormat.toLowerCase() }}",
         "driveId": {
           "__rl": true,
           "value": "My Drive",
@@ -113,8 +139,10 @@
       "name": "Google Drive: Resguardar en Raw Anual",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
+      "continueOnFail": true,
+      "onError": "continueRegularOutput",
       "position": [
-        1104,
+        1344,
         -192
       ],
       "credentials": {
@@ -126,16 +154,263 @@
     },
     {
       "parameters": {
-        "jsCode": "console.log('Auditoría anual omitida: sin novedades en GCBA CKAN.', $json.eventToken);\nreturn [{ json: { status: 'SKIPPED', reason: 'SKIP_NO_ANNUAL_UPDATE', details: $json } }];"
+        "jsCode": "const reason = $json.eventToken || \"SKIP_NO_ANNUAL_UPDATE\";\nconsole.log(`Auditoría GCBA [${$json.datasetId}]:`, reason);\nreturn [{ json: { datasetId: $json.datasetId, status: reason === \"WARN_GCBA_UNAVAILABLE\" ? \"FALLBACK\" : \"SKIPPED\", reason } }];"
       },
       "id": "4ca66f16-c190-4bb8-a52e-0aef8c3d770c",
       "name": "Log: Sin Novedades Anuales",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        880,
+        1120,
         16
       ]
+    },
+    {
+      "parameters": {
+        "mode": "append"
+      },
+      "id": "e2f3a4b5-6c7d-4e8f-9a0b-1c2d3e4f5a6b",
+      "name": "Merge: Converger Auditoría GCBA",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1568,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all().map(i => i.json);\nreturn [{\n  json: {\n    auditedCount: items.length,\n    summary: items,\n    triggerTrainer: true\n  }\n}];"
+      },
+      "id": "f3a4b5c6-7d8e-4f9a-0b1c-2d3e4f5a6b7c",
+      "name": "Consolidar Auditoría Anual (1 Trigger)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "operation": "search",
+        "searchMethod": "query",
+        "queryString": "'10bpShYlE_FSzUtW3xNz5jH0BGbRGF4yo' in parents and trashed = false and mimeType = 'text/csv'",
+        "returnAll": true,
+        "filter": {},
+        "options": {}
+      },
+      "id": "11a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c",
+      "name": "Google Drive: Listar CSVs de Entrenamiento",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2016,
+        -96
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "riizvhW8kOx9iE8X",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "22b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d",
+      "name": "Google Drive: Descargar CSVs de Entrenamiento",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2240,
+        -96
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "riizvhW8kOx9iE8X",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all();\nconst csvTexts = [];\nfor (let i = 0; i < items.length; i++) {\n  const buf = await this.helpers.getBinaryDataBuffer(i, \"data\");\n  if (buf && buf.length > 0) {\n    csvTexts.push(buf.toString(\"utf8\"));\n  }\n}\nif (csvTexts.length === 0) {\n  throw new Error(\"ERR_NO_TRAINING_CSV_IN_DRIVE: No se encontraron archivos CSV en Drive para entrenar.\");\n}\nreturn [{\n  json: {\n    minR2Threshold: 0.80,\n    minSamples: 500,\n    trainingDataCsvText: csvTexts\n  }\n}];"
+      },
+      "id": "33c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e",
+      "name": "Preparar Payload de Entrenamiento",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/lukita7956~mlops-annual-trainer/runs?waitForFinish=360",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 360000
+        }
+      },
+      "id": "a7f2b910-4c6e-4f83-9c12-1e8b3d4a5f90",
+      "name": "Apify: Actor Trainer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2688,
+        -96
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "vnUeNbHvvtxDiCq1",
+          "name": "Apify Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const runResp = $(\"Apify: Actor Trainer\").first().json || {};\nconst runData = runResp.data || runResp;\nconst status = runData.status || \"UNKNOWN\";\nconst kvStoreId = runData.defaultKeyValueStoreId;\nconst prodStoreResp = $(\"Apify: Abrir Store Producción\").first().json || {};\nconst prodStoreId = (prodStoreResp.data && prodStoreResp.data.id) || \"mlops-production-models\";\nif (status !== \"SUCCEEDED\" || !kvStoreId) {\n  throw new Error(`ERR_TRAINER_RUN_FAILED: status=${status}, kvStoreId=${kvStoreId}`);\n}\nconst files = [\n  \"kmeans_model.joblib\",\n  \"xgb_price_model.joblib\",\n  \"model_metadata.joblib\",\n  \"models_manifest.json\"\n];\nreturn files.map(fileName => ({\n  json: {\n    kvStoreId,\n    prodStoreId,\n    fileName,\n    downloadUrl: `https://api.apify.com/v2/key-value-stores/${kvStoreId}/records/${fileName}`\n  }\n}));"
+      },
+      "id": "44d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f",
+      "name": "Verificar Trainer & Listar Artefactos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2912,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.downloadUrl }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "55e6f7a8-b9c0-4d1e-2f3a-4b5c6d7e8f9a",
+      "name": "Apify: Descargar Artefactos del Modelo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3136,
+        -96
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "vnUeNbHvvtxDiCq1",
+          "name": "Apify Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "={{ $now.format(\"yyyy_MM\") }}_{{ $(\"Verificar Trainer & Listar Artefactos\").item.json.fileName }}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "03_model_registry",
+          "mode": "list",
+          "cachedResultName": "03_model_registry"
+        },
+        "options": {}
+      },
+      "id": "66f7a8b9-c0d1-4e2f-3a4b-5c6d7e8f9a0b",
+      "name": "Google Drive: Guardar Modelo en 03_model_registry",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        3360,
+        -96
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "riizvhW8kOx9iE8X",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/key-value-stores?name=mlops-production-models",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "77a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c",
+      "name": "Apify: Abrir Store Producción",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2912,
+        -220
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "vnUeNbHvvtxDiCq1",
+          "name": "Apify Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ \"https://api.apify.com/v2/key-value-stores/\" + $(\"Verificar Trainer & Listar Artefactos\").item.json.prodStoreId + \"/records/\" + $(\"Verificar Trainer & Listar Artefactos\").item.json.fileName }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "88b9c0d1-e2f3-4a4b-5c6d-7e8f9a0b1c2d",
+      "name": "Apify: Publicar Modelo en Producción",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3360,
+        48
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "vnUeNbHvvtxDiCq1",
+          "name": "Apify Header Auth"
+        }
+      }
     }
   ],
   "connections": {
@@ -143,14 +418,25 @@
       "main": [
         [
           {
-            "node": "CKAN API: Consultar Delitos CABA",
+            "node": "Definir Catálogo Datasets GCBA",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "CKAN API: Consultar Delitos CABA": {
+    "Definir Catálogo Datasets GCBA": {
+      "main": [
+        [
+          {
+            "node": "CKAN API: Consultar Datasets GCBA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CKAN API: Consultar Datasets GCBA": {
       "main": [
         [
           {
@@ -195,6 +481,132 @@
         [
           {
             "node": "Google Drive: Resguardar en Raw Anual",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive: Resguardar en Raw Anual": {
+      "main": [
+        [
+          {
+            "node": "Merge: Converger Auditoría GCBA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log: Sin Novedades Anuales": {
+      "main": [
+        [
+          {
+            "node": "Merge: Converger Auditoría GCBA",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge: Converger Auditoría GCBA": {
+      "main": [
+        [
+          {
+            "node": "Consolidar Auditoría Anual (1 Trigger)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consolidar Auditoría Anual (1 Trigger)": {
+      "main": [
+        [
+          {
+            "node": "Google Drive: Listar CSVs de Entrenamiento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive: Listar CSVs de Entrenamiento": {
+      "main": [
+        [
+          {
+            "node": "Google Drive: Descargar CSVs de Entrenamiento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive: Descargar CSVs de Entrenamiento": {
+      "main": [
+        [
+          {
+            "node": "Preparar Payload de Entrenamiento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Payload de Entrenamiento": {
+      "main": [
+        [
+          {
+            "node": "Apify: Actor Trainer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify: Actor Trainer": {
+      "main": [
+        [
+          {
+            "node": "Apify: Abrir Store Producción",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Trainer & Listar Artefactos": {
+      "main": [
+        [
+          {
+            "node": "Apify: Descargar Artefactos del Modelo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify: Descargar Artefactos del Modelo": {
+      "main": [
+        [
+          {
+            "node": "Google Drive: Guardar Modelo en 03_model_registry",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Apify: Publicar Modelo en Producción",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify: Abrir Store Producción": {
+      "main": [
+        [
+          {
+            "node": "Verificar Trainer & Listar Artefactos",
             "type": "main",
             "index": 0
           }

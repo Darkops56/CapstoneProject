@@ -1,5 +1,6 @@
 """Pipeline de reentrenamiento serverless anual para K-Means y XGBoost."""
 
+import hashlib
 import os
 from pathlib import Path
 from typing import Any
@@ -34,6 +35,25 @@ REGRESSION_FEATURES = [
 ]
 
 DEFAULT_TARGET_COL = "costo_total_ars"
+SHAP_BACKGROUND_MAX_SAMPLES = 100
+
+
+def compute_dataset_hash(df: pd.DataFrame) -> str:
+    """Calcula hash SHA-256 determinista del DataFrame de entrenamiento."""
+    cols = sorted(list(df.columns))
+    csv_bytes = df[cols].to_csv(index=False).encode("utf-8")
+    return hashlib.sha256(csv_bytes).hexdigest()
+
+
+def compute_shap_background(
+    X: pd.DataFrame,
+    max_samples: int = SHAP_BACKGROUND_MAX_SAMPLES,
+    random_state: int = 42,
+) -> pd.DataFrame:
+    """Subsamplea el conjunto de fondo para SHAP garantizando ejecución acotada (< 90s)."""
+    if len(X) <= max_samples:
+        return X.copy()
+    return X.sample(n=max_samples, random_state=random_state).reset_index(drop=True)
 
 
 class InsufficientDataError(ValueError):
@@ -190,8 +210,10 @@ def run_training_pipeline(
     # 1. K-Means
     kmeans_pipe, cluster_labels, kmeans_report = train_kmeans(df)
 
-    # 2. XGBoost
+    # 2. XGBoost + subsampling de fondo SHAP (N <= 100)
     xgb_model, xgb_report = train_xgboost(df, target_col=target_col, min_r2=min_r2)
+    shap_bg = compute_shap_background(df[REGRESSION_FEATURES].fillna(0))
+    dataset_hash = compute_dataset_hash(df)
 
     # 3. Metadatos
     metadata = {
@@ -199,6 +221,8 @@ def run_training_pipeline(
         "cluster_features": CLUSTER_FEATURES,
         "cluster_labels": cluster_labels,
         "target_col": target_col,
+        "dataset_hash": dataset_hash,
+        "shap_background_size": len(shap_bg),
         "metrics": {
             "r2": xgb_report["r2"],
             "rmse": xgb_report["rmse"],
@@ -219,6 +243,8 @@ def run_training_pipeline(
     return {
         "status": "success",
         "sample_count": len(df),
+        "dataset_hash": dataset_hash,
+        "shap_background_size": len(shap_bg),
         "kmeans_report": kmeans_report,
         "xgboost_report": xgb_report,
         "artifacts": {

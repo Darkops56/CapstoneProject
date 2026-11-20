@@ -124,3 +124,22 @@ def test_export_version_dry_run(tmp_path: Path):
     assert res["status"] == "dry_run"
     assert res["version"] == "v1"
     assert "dummy.joblib" in res["uploaded_files"]
+
+
+def test_load_dataset_from_csv_text_list_and_dedup():
+    """Verifica que load_dataset_from_input concatene listas de CSVs desde n8n y deduplique por clave natural."""
+    from trainer.src.main import load_dataset_from_input
+
+    csv_1 = (
+        "calle_normalizada,m2_cubiertos,ambientes,costo_total_ars\n"
+        "av santa fe 1200,45.0,2,450000\n"
+        "av cabildo 2100,60.0,3,700000\n"
+    )
+    csv_2 = (
+        "calle_normalizada,m2_cubiertos,ambientes,costo_total_ars\n"
+        "av santa fe 1200,45.0,2,520000\n"
+    )
+    df = load_dataset_from_input({"trainingDataCsvText": [csv_1, csv_2]})
+    assert len(df) == 2
+    santa_fe = df[df["calle_normalizada"] == "av santa fe 1200"].iloc[0]
+    assert santa_fe["costo_total_ars"] == 520000

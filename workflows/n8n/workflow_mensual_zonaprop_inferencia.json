@@ -104,7 +104,7 @@
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"datasetId\": \"{{ $json.datasetId }}\",\n  \"limit\": 5\n}",
+        "jsonBody": "={\n  \"datasetId\": \"{{ $json.datasetId }}\",\n  \"limit\": 5,\n  \"modelStoreName\": \"mlops-production-models\"\n}",
         "options": {
           "timeout": 180000
         }
@@ -261,6 +261,38 @@
         880,
         432
       ]
+    },
+    {
+      "parameters": {
+        "name": "=alquileres_caba_historico_{{ $now.format(\"yyyy_MM\") }}.csv",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "04_historico_alquileres_anual",
+          "mode": "list",
+          "cachedResultName": "04_historico_alquileres_anual"
+        },
+        "options": {}
+      },
+      "id": "b9e4d120-7f1a-4c32-8a45-2d9f6e1c7b80",
+      "name": "Google Drive: Acumular en Histórico Anual",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1344,
+        416
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "riizvhW8kOx9iE8X",
+          "name": "Google Drive account"
+        }
+      }
     }
   ],
   "connections": {
@@ -331,6 +363,11 @@
         [
           {
             "node": "Google Drive: Guardar CSV Mensual",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Drive: Acumular en Histórico Anual",
             "type": "main",
             "index": 0
           }

@@ -1,6 +1,6 @@
 # Runbook de Despliegue y Operación: Pipeline de Inferencia Zonaprop, Model Registry & n8n
 
-Este documento detalla el paso a paso minucioso para desplegar los actores de inferencia y entrenamiento en **Apify Cloud**, configurar el almacenamiento versionado en **Google Drive** y orquestar las ejecuciones automáticas y políticas de retención utilizando **n8n**.
+Este documento detalla el paso a paso minucioso para desplegar los actores de inferencia y entrenamiento en **Apify Cloud**, configurar el almacenamiento versionado en **Google Drive** y orquestar las ejecuciones automáticas, políticas de retención y actualización de modelos utilizando **n8n**.
 
 ---
 
@@ -14,18 +14,19 @@ El ecosistema desacopla estrictamente el ciclo mensual de inferencia del ciclo a
 ├──────────────────────────────────────┬──────────────────────────────────────┤
 │       CICLO MENSUAL (Día 1)          │        CICLO ANUAL (1 de Marzo)      │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
-│ 1. Scraper Zonaprop (Apify)          │ 1. Auditoría CKAN GCBA (Delitos)     │
+│ 1. Scraper Zonaprop (Apify)          │ 1. Auditoría CKAN GCBA (4 Datasets)  │
 │ 2. Circuit Breaker & Idempotencia    │ 2. Resguardo Raw en Google Drive     │
-│ 3. Actor Inferencia (actor/)         │ 3. Actor Reentrenamiento (trainer/)  │
+│ 3. Actor Inferencia (actors/inference│ 3. Actor Reentrenamiento (trainer)   │
 │ 4. Guardar CSV en 01_mensual         │ 4. Registro en 03_model_registry     │
-│ 5. Purga Retención Trimestral        │ 5. Actualización models_manifest.json│
+│ 5. Purga Retención Trimestral        │ 5. Publicación en Apify KV Store     │
+│ 6. Acumular en 04_historico_anual    │ 6. Carga dinámica en actor inferencia│
 └──────────────────────────────────────┴──────────────────────────────────────┘
 ```
 
 ### Repositorio de Workflows (`workflows/n8n/`)
-- **`workflow_mensual_zonaprop_inferencia.json`**: Flujo mensual completo con extracción Zonaprop, scoring corporativo, persistencia en Google Drive y **purga automática de datasets de más de 3 meses**.
-- **`workflow_anual_auditoria_gcba.json`**: Flujo anual de auditoría e ingesta de datos abiertos de delitos del GCBA.
-- **`Pipeline Completo Anual y Mensual.json`**: Integración de ambos ciclos en un único lienzo visual.
+- **`workflow_mensual_zonaprop_inferencia.json`**: Flujo mensual completo con extracción Zonaprop, scoring corporativo, persistencia en Google Drive, **purga automática de datasets de más de 3 meses** y acumulación inmutable en histórico anual.
+- **`workflow_anual_auditoria_gcba.json`**: Flujo anual de auditoría e ingesta de datos abiertos del GCBA (delitos, bocas de subte, ruido y escuelas) con reentrenamiento serverless y guardado en Drive.
+- **`Pipeline Completo Anual y Mensual.json`**: Integración de ambos ciclos en un único lienzo visual unificado (**31 nodos**).
 
 > **Seguridad de Credenciales:** Los archivos JSON exportados solo contienen identificadores de referencia interna (`id`), garantizando que **ningún token de Apify ni credencial OAuth2 de Google Drive queda expuesto en el código**.
 
@@ -53,7 +54,7 @@ El ecosistema desacopla estrictamente el ciclo mensual de inferencia del ciclo a
 
 ## 3. Despliegue de Actores en Apify Cloud
 
-El proyecto cuenta con dos actores serverless desacoplados para optimizar memoria, tiempos de inicio y costos:
+El proyecto cuenta con dos actores serverless desacoplados dentro del directorio `actors/`:
 
 ### Paso 3.1: Autenticación en Apify
 En tu terminal local ejecuta:
@@ -67,11 +68,11 @@ apify info
 
 ---
 
-### Paso 3.2: Desplegar Actor de Inferencia Mensual (`actor/`)
-Este actor ligero procesa los datos mensuales, cruza el geo-caché de CABA y aplica inferencia con modelos congelados:
+### Paso 3.2: Desplegar Actor de Inferencia Mensual (`actors/inference/`)
+Este actor ligero procesa los datos mensuales, cruza el geo-caché embebido de CABA y aplica inferencia con modelos locales o cargados dinámicamente:
 
 ```bash
-cd actor
+cd actors/inference
 apify push
 ```
 - Se compilará en Apify bajo el nombre `zonaprop-curator-inference`.
@@ -82,8 +83,8 @@ apify push
 
 ---
 
-### Paso 3.3: Desplegar Actor de Reentrenamiento Anual (`trainer/`)
-Este actor serverless entrena bajo demanda XGBoost y K-Means, evalúa $R^2 \ge 0.80$ y exporta modelos a Drive:
+### Paso 3.3: Desplegar Actor de Reentrenamiento Anual (`actors/trainer/`)
+Este actor serverless entrena bajo demanda XGBoost y K-Means, evalúa $R^2 \ge 0.80$, aplica subsampling SHAP y exporta modelos a Drive:
 
 ```bash
 cd ../trainer
@@ -127,15 +128,17 @@ En tu unidad de [Google Drive](https://drive.google.com/), estructura las siguie
 
 ---
 
-### Paso 5.2: Importar el Workflow
+### Paso 5.2: Importar el Workflow en n8n
 
-1. En n8n, crea un nuevo workflow.
+> ⚠️ **Advertencia Operativa de Importación Limpia:** Antes de importar un workflow nuevo en n8n, asegúrate de crear un lienzo nuevo en blanco o borrar los nodos preexistentes. Si importas sobre un lienzo con nodos existentes, n8n renombrará los nodos agregando sufijos (`...1`, `...2`), lo que puede duplicar ejecuciones en el Cron.
+
+1. En n8n, crea un nuevo workflow en blanco.
 2. Menú superior derecho (`...`) > **Import from File**.
-3. Selecciona `workflows/n8n/workflow_mensual_zonaprop_inferencia.json`.
+3. Selecciona `workflows/n8n/Pipeline Completo Anual y Mensual.json` (o el flujo específico que desees operar).
 
 ---
 
-### Paso 5.3: Configuración Detallada de los Nodos en n8n
+### Paso 5.3: Configuración Detallada de los Nodos Clave en n8n
 
 | Nodo | Parámetros Clave | Configuración Requerida |
 | :--- | :--- | :--- |
@@ -143,12 +146,13 @@ En tu unidad de [Google Drive](https://drive.google.com/), estructura las siguie
 | **Apify: Actor Curado & Inferencia** | URL | `https://api.apify.com/v2/acts/TU_USUARIO~zonaprop-curator-inference/runs?waitForFinish=120` |
 | **Descargar CSV Enriquecido** | Options > Response | **Response Format: `File`** (descarga binaria, no texto) |
 | **Google Drive: Guardar CSV Mensual** | Resource / Operation | Folder: `01_mensual_enriquecido`, Name: `=alquileres_caba_enriquecido_{{ $now.format('yyyy_MM') }}.csv` |
-| **Google Drive: Listar Archivos 01_mensual_enriquecido** | Resource / Operation | **Resource:** `File/Folder`<br>**Operation:** `Search`<br>**Search Method:** `Advanced Search` (valor interno en JSON: `query`)<br>**Query String:** `'10bpShYlE_FSzUtW3xNz5jH0BGbRGF4yo' in parents and trashed = false and mimeType = 'text/csv'`<br>**Return All:** `true` |
+| **Google Drive: Listar Archivos 01_mensual_enriquecido** | Resource / Operation | **Resource:** `File/Folder`<br>**Operation:** `Search`<br>**Search Method:** `Advanced Search` (valor interno: `query`)<br>**Query String:** `'10bpShYlE_FSzUtW3xNz5jH0BGbRGF4yo' in parents and trashed = false and mimeType = 'text/csv'`<br>**Return All:** `true` |
 | **Retención: Filtrar Archivos > 3 Meses** | Code Node (JS) | Ordena por fecha descendente y retorna excedentes a purgar (`items.slice(3)`) si `length > 3`. |
 | **Google Drive: Purgar Excedente a Papelera** | Resource / Operation | **Resource:** `File`<br>**Operation:** `Delete`<br>**File ID:** `={{ $json.fileId }}`<br>**Delete Permanently:** `false` (envía a papelera defensivamente) |
-| **Google Drive: Acumular en Histórico Anual** | Resource / Operation | Folder: `04_historico_alquileres_anual`, Name: `=alquileres_caba_historico_{{ $now.format('yyyy_MM') }}.csv` (retención dual inmutable) |
-| **CKAN API: Consultar Delitos CABA** | Resiliencia | `Continue on Fail: true`, `timeout: 30000ms`. Si falla, emite `WARN_GCBA_UNAVAILABLE` y converge al reentrenamiento anual. |
+| **Google Drive: Acumular en Histórico Anual** | Resource / Operation | Folder: `04_historico_alquileres_anual`, Name: `=alquileres_caba_historico_{{ $now.format('yyyy_MM') }}.csv` |
+| **CKAN API: Consultar Datasets GCBA** | Resiliencia | `Continue on Fail: true`, `timeout: 30000ms`. Si falla, emite `WARN_GCBA_UNAVAILABLE` y converge al reentrenamiento. |
 | **Apify: Actor Trainer** | URL & Timeout | `POST https://api.apify.com/v2/acts/TU_USUARIO~mlops-annual-trainer/runs?waitForFinish=360`, `timeout: 360000ms`, Auth: `Apify Header Auth` |
+| **Apify: Publicar Modelo en Producción** | KV Store | Publica binarios `.joblib` en el Store de Apify para habilitar carga dinámica sin reconstruir Docker. |
 
 ---
 
@@ -157,12 +161,12 @@ En tu unidad de [Google Drive](https://drive.google.com/), estructura las siguie
 1. En n8n, haz clic en **Test workflow** (o *Execute workflow*).
 2. Verifica la secuencia:
    - Scraper recolecta las publicaciones de Zonaprop.
-   - Circuit Breaker valida `SUCCEEDED` y presencia de dataset.
+   - Circuit Breaker valida `SUCCEEDED` y presencia de al menos 500 registros.
    - Inferencia en Apify genera predicciones y scores (0-100).
    - n8n transfiere el CSV a la carpeta `01_mensual_enriquecido`.
-   - El nodo de búsqueda lista los CSVs existentes en la carpeta.
+   - Se guardan los registros en `04_historico_alquileres_anual`.
    - Si existen más de 3 datasets mensuales, los más antiguos se envían a la papelera.
-3. **Pase a Producción:** Activa el interruptor **Active** en la esquina superior de n8n para dejar programado el Cron mensual (Día 1 de cada mes a las 03:00 UTC).
+3. **Pase a Producción:** Activa el interruptor **Active** en la esquina superior de n8n para programar el Cron mensual (Día 1 de cada mes a las 03:00 UTC) y anual (1 de Marzo a las 04:00 UTC).
 
 ---
 
@@ -172,9 +176,9 @@ En tu unidad de [Google Drive](https://drive.google.com/), estructura las siguie
 | :--- | :--- | :--- |
 | `Could not get parameter "queryString"` | El nodo de búsqueda de Drive tiene `Search Method` configurado con un texto no válido o vacío. | En el nodo de búsqueda, cambiar el desplegable **Search Method** a **`Advanced Search`**. Se abrirá el campo **Query String** para pegar la consulta. |
 | `Cannot read properties of undefined (reading 'execute')` | Incompatibilidad de operación en n8n: se seleccionó Resource `File` con operation `list` (la cual no existe en la v3 del nodo). | Configurar **Resource: `File/Folder`** y **Operation: `Search`**. |
-| `Apify CLI requires Node.js >= 22` | La terminal tiene activa una versión desactualizada o alpha de Node. | Ejecutar `nvm use 22` o `nvm alias default 22`. |
+| `Apify CLI requires Node.js >= 22` | La terminal tiene activa una versión desactualizada de Node. | Ejecutar `nvm use 22` o `nvm alias default 22`. |
 | `ForbiddenError: Insufficient permissions for the dataset (exit code 91)` | El Actor de Apify tiene permisos limitados y no puede leer datasets de otros actores. | En Apify Console > Actor `zonaprop-curator-inference` > Settings > Access & Permissions: seleccionar **`Full permissions`**. |
 | Drive: `expects binary file 'data', but none was found` | El nodo HTTP de descarga no especificó el formato de archivo. | En el nodo HTTP de descarga, ir a `Options` > `Response` > `Response Format` y seleccionar **`File`**. |
-| `ERR_METRIC_REGRESSION` en el Actor Trainer | El modelo reentrenado obtuvo un $R^2 < 0.80$ y abortó para proteger producción. | Verificar calidad y volumen de datos en el CSV de reentrenamiento. El registry anterior permanece intacto. |
+| `ERR_METRIC_REGRESSION` en el Actor Trainer | El modelo reentrenado obtuvo un $R^2 < 0.80$ y abortó para proteger producción. | Verificar calidad y volumen de datos en el acumulador anual. El registry anterior permanece intacto. |
 | `WARN_GCBA_UNAVAILABLE` en el flujo anual | La API CKAN de GCBA no respondió dentro de 30s o retornó HTTP 5xx. | Comportamiento resiliente esperado: n8n continúa hacia `Apify: Actor Trainer` conservando el árbol de delitos vigente. |
-| `SKIP_IDENTICAL_DATASET` en el Registry | El hash SHA-256 del dataset anual coincide con la versión en producción. | Comportamiento idempotente esperado: se omite el bump duplicado de versión sin alterar producción. |
+| `SKIP_IDENTICAL_DATASET` en el Registry | El hash SHA-256 del dataset anual coincide con la versión en producción. | Comportamiento idempotente esperado: se omite el incremento duplicado de versión sin alterar producción. |

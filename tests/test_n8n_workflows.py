@@ -221,8 +221,8 @@ def test_annual_workflow_convergent_trainer_and_resilience(annual_workflow):
 
 
 def test_unified_pipeline_dual_retention_and_trainer():
-    """Verifica que el lienzo unificado incluya retención dual (04_historico_alquileres_anual) y Actor Trainer."""
-    wf_path = WORKFLOWS_DIR / "Pipeline Completo Anual y Mensual.json"
+    """Verifica que el lienzo unificado de producción incluya retención dual y Actor Trainer."""
+    wf_path = WORKFLOWS_DIR / "Pipeline Completo Anual y Mensual, Inferencia y Persistencia Drive.json"
     with open(wf_path, "r", encoding="utf-8") as f:
         unified_wf = json.load(f)
 
@@ -236,3 +236,18 @@ def test_unified_pipeline_dual_retention_and_trainer():
     assert "WARN_GCBA_UNAVAILABLE" in all_json_str, (
         "El pipeline unificado debe incluir degradación elegante WARN_GCBA_UNAVAILABLE"
     )
+    assert "minSamples: 500" in all_json_str, "El pipeline de producción debe exigir minSamples: 500"
+    assert "minR2Threshold: 0.80" in all_json_str, "El pipeline de producción debe exigir minR2Threshold: 0.80"
+
+
+def test_test_reduced_unified_pipeline_free_tier():
+    """Verifica que el workflow de test reducido configure límites para Free Tier."""
+    wf_path = WORKFLOWS_DIR / "Pipeline Completo Anual y Mensual (Test Reducido Free Tier).json"
+    with open(wf_path, "r", encoding="utf-8") as f:
+        test_wf = json.load(f)
+
+    all_json_str = json.dumps(test_wf)
+    assert "Pipeline Completo Anual y Mensual (Test Reducido Free Tier)" in all_json_str
+    assert "minSamples: 30" in all_json_str, "El pipeline de test reducido debe permitir minSamples: 30"
+    assert "minR2Threshold: 0.10" in all_json_str, "El pipeline de test reducido debe permitir minR2Threshold: 0.10"
+    assert "maxItems" in all_json_str and "50" in all_json_str, "El pipeline de test reducido debe solicitar 50 items"

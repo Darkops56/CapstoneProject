@@ -143,3 +143,17 @@ def test_load_dataset_from_csv_text_list_and_dedup():
     assert len(df) == 2
     santa_fe = df[df["calle_normalizada"] == "av santa fe 1200"].iloc[0]
     assert santa_fe["costo_total_ars"] == 520000
+
+
+def test_load_dataset_without_calle_preserves_distinct_listings():
+    """Verifica que datasets enriquecidos sin calle_normalizada no colapsen por la columna ambientes sola."""
+    from actors.trainer.src.main import load_dataset_from_input
+
+    # 50 filas con listing_id distinto y varios ambientes (1 a 5)
+    csv_rows = ["listing_id,ambientes,m2_totales,costo_total_ars"]
+    for i in range(50):
+        csv_rows.append(f"MLA_{i:04d},{1 + (i % 5)},{30 + i},{400000 + i * 5000}")
+    csv_text = "\n".join(csv_rows)
+
+    df = load_dataset_from_input({"trainingDataCsvText": csv_text})
+    assert len(df) == 50, f"Se esperaban 50 registros preservados, pero se obtuvieron {len(df)}"

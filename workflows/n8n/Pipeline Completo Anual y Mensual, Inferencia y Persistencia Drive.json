@@ -1,5 +1,5 @@
 {
-  "name": "Pipeline Mensual Zonaprop Inferencia y Persistencia Drive",
+  "name": "Pipeline Completo Anual y Mensual, Inferencia y Persistencia Drive",
   "nodes": [
     {
       "parameters": {
@@ -12,26 +12,26 @@
           ]
         }
       },
-      "id": "654b4e17-8f2d-4a72-b4d8-767272b8ce46",
+      "id": "7e400267-4ca3-4d54-a5df-2894248d3e6f",
       "name": "Cron Anual (1 de Marzo)",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
-        0,
-        -112
+        -1136,
+        0
       ]
     },
     {
       "parameters": {
         "jsCode": "return [\n  { json: { datasetId: \"delitos\", filePrefix: \"delitos_gcba_anual\" } },\n  { json: { datasetId: \"bocas-subte\", filePrefix: \"bocas_subte_gcba_anual\" } },\n  { json: { datasetId: \"mapa-ruido\", filePrefix: \"mapa_ruido_gcba_anual\" } },\n  { json: { datasetId: \"establecimientos-educativos\", filePrefix: \"establecimientos_educativos_gcba_anual\" } }\n];"
       },
-      "id": "d1e2f3a4-5b6c-4d7e-8f9a-0b1c2d3e4f5a",
+      "id": "829466de-6843-4633-8c47-03c28f6233c5",
       "name": "Definir Catálogo Datasets GCBA",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        224,
-        -112
+        -912,
+        0
       ]
     },
     {
@@ -41,80 +41,85 @@
           "timeout": 30000
         }
       },
-      "id": "c5d27351-8297-4bc7-aec0-9d87bcdd50b8",
+      "id": "df9c1f3a-58a6-43f3-85ac-34f3491d1203",
       "name": "CKAN API: Consultar Datasets GCBA",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "continueOnFail": true,
-      "onError": "continueRegularOutput",
       "position": [
-        448,
-        -112
-      ]
+        -688,
+        0
+      ],
+      "continueOnFail": true,
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "jsCode": "const catalog = $(\"Definir Catálogo Datasets GCBA\").all();\nconst responses = $input.all();\nconst staticData = $getWorkflowStaticData(\"global\");\nstaticData.lastModifiedByDataset = staticData.lastModifiedByDataset || {};\n\nreturn responses.map((item, idx) => {\n  const meta = catalog[idx]?.json || { datasetId: \"unknown\", filePrefix: \"gcba_anual\" };\n  const raw = item.json || {};\n  if (raw.error || !raw.result) {\n    return {\n      json: {\n        datasetId: meta.datasetId,\n        filePrefix: meta.filePrefix,\n        datasetTitle: meta.datasetId,\n        metadataModified: \"\",\n        lastModified: staticData.lastModifiedByDataset[meta.datasetId] || \"\",\n        hasUpdate: false,\n        downloadUrl: \"\",\n        resourceFormat: \"csv\",\n        resourceName: `${meta.datasetId}_unavailable`,\n        gcbaStatus: \"WARN_GCBA_UNAVAILABLE\",\n        eventToken: \"WARN_GCBA_UNAVAILABLE\"\n      }\n    };\n  }\n  const result = raw.result;\n  const metadataModified = result.metadata_modified || \"\";\n  const resources = result.resources || [];\n  const lastModified = staticData.lastModifiedByDataset[meta.datasetId] || \"\";\n  const hasUpdate = Boolean(metadataModified && metadataModified !== lastModified);\n  const latestResource = resources.find(r => r.format?.toLowerCase() === \"csv\" || r.format?.toLowerCase() === \"xlsx\") || resources[0];\n  if (hasUpdate) {\n    staticData.lastModifiedByDataset[meta.datasetId] = metadataModified;\n  }\n  return {\n    json: {\n      datasetId: meta.datasetId,\n      filePrefix: meta.filePrefix,\n      datasetTitle: result.title || meta.datasetId,\n      metadataModified,\n      lastModified,\n      hasUpdate,\n      downloadUrl: latestResource?.url || \"\",\n      resourceFormat: latestResource?.format || \"csv\",\n      resourceName: latestResource?.name || `${meta.datasetId}_actualizado`,\n      gcbaStatus: hasUpdate ? \"EVENT_GCBA_DATA_UPDATED\" : \"SKIP_NO_ANNUAL_UPDATE\",\n      eventToken: hasUpdate ? \"EVENT_GCBA_DATA_UPDATED\" : \"SKIP_NO_ANNUAL_UPDATE\"\n    }\n  };\n});"
       },
-      "id": "0856f7f0-e7f3-401f-8519-1d332e4247a4",
+      "id": "69da25e6-88d7-4ca5-8cd5-72cd2c43f22c",
       "name": "Evaluar Metadatos & URL Descarga",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        672,
-        -112
+        -464,
+        0
       ]
     },
     {
       "parameters": {
         "conditions": {
-          "boolean": [
-            {
-              "value1": "={{ $json.hasUpdate }}",
-              "value2": true
-            }
-          ],
-          "combinator": "and",
           "options": {
             "caseSensitive": true,
             "leftValue": "",
             "typeValidation": "strict",
             "version": 1
-          }
+          },
+          "conditions": [
+            {
+              "id": "0ff0e6b2-009f-439f-a3e4-30b413af9073",
+              "leftValue": "={{ $json.hasUpdate }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
         },
         "options": {}
       },
-      "id": "50707b19-bd85-4d8d-b110-62483f78f910",
+      "id": "b6528c58-e51a-42e1-88a9-18b4e3513699",
       "name": "¿Hay Novedades en GCBA?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        896,
-        -112
+        -240,
+        0
       ]
     },
     {
       "parameters": {
         "url": "={{ $json.downloadUrl }}",
         "options": {
-          "timeout": 60000,
           "response": {
             "response": {
               "responseFormat": "file"
             }
-          }
+          },
+          "timeout": 60000
         }
       },
-      "id": "abd336af-bdec-4eb5-94da-b71586c4810c",
+      "id": "6b8e7413-bd9a-4f4a-95b1-6adfb317928e",
       "name": "Descargar Dataset GCBA",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "continueOnFail": true,
-      "onError": "continueRegularOutput",
       "position": [
-        1120,
-        -192
-      ]
+        -16,
+        -80
+      ],
+      "continueOnFail": true,
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -135,61 +140,58 @@
         },
         "options": {}
       },
-      "id": "180adb91-59d2-4bc9-9647-332cd3272ec6",
+      "id": "5e785e92-37e7-42a0-a28e-3ee191040a34",
       "name": "Google Drive: Resguardar en Raw Anual",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
-      "continueOnFail": true,
-      "onError": "continueRegularOutput",
       "position": [
-        1344,
-        -192
+        208,
+        -80
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "riizvhW8kOx9iE8X",
           "name": "Google Drive account"
         }
-      }
+      },
+      "continueOnFail": true,
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "jsCode": "const reason = $json.eventToken || \"SKIP_NO_ANNUAL_UPDATE\";\nconsole.log(`Auditoría GCBA [${$json.datasetId}]:`, reason);\nreturn [{ json: { datasetId: $json.datasetId, status: reason === \"WARN_GCBA_UNAVAILABLE\" ? \"FALLBACK\" : \"SKIPPED\", reason } }];"
       },
-      "id": "4ca66f16-c190-4bb8-a52e-0aef8c3d770c",
+      "id": "a6e2a190-e2a3-4714-8357-10891b99f0c6",
       "name": "Log: Sin Novedades Anuales",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1120,
+        -16,
+        128
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "f0a91d73-ea7f-4312-b1d5-ee36534cd7d7",
+      "name": "Merge: Converger Auditoría GCBA",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        432,
         16
       ]
     },
     {
       "parameters": {
-        "mode": "append"
-      },
-      "id": "e2f3a4b5-6c7d-4e8f-9a0b-1c2d3e4f5a6b",
-      "name": "Merge: Converger Auditoría GCBA",
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3,
-      "position": [
-        1568,
-        -96
-      ]
-    },
-    {
-      "parameters": {
-        "mode": "runOnceForAllItems",
         "jsCode": "const items = $input.all().map(i => i.json);\nreturn [{\n  json: {\n    auditedCount: items.length,\n    summary: items,\n    triggerTrainer: true\n  }\n}];"
       },
-      "id": "f3a4b5c6-7d8e-4f9a-0b1c-2d3e4f5a6b7c",
+      "id": "25b7e9ac-2e91-40fd-ab1c-be60340fc9da",
       "name": "Consolidar Auditoría Anual (1 Trigger)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1792,
-        -96
+        656,
+        16
       ]
     },
     {
@@ -203,13 +205,13 @@
           ]
         }
       },
-      "id": "926339da-457d-4d8f-96d9-cb5ffdbf1b31",
+      "id": "434fe941-8e1b-4ab2-a9ea-aa0c1e4ac7df",
       "name": "Cron Mensual (Día 1 03:00)",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
-        -16,
-        560
+        -1152,
+        672
       ]
     },
     {
@@ -220,18 +222,18 @@
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "{\n  \"maxItems\": 5,\n  \"startUrls\": [\n    {\n      \"url\": \"https://www.zonaprop.com.ar/departamentos-alquiler-capital-federal.html\"\n    }\n  ]\n}",
+        "jsonBody": "{\n  \"maxItems\": 1000,\n  \"startUrls\": [\n    {\n      \"url\": \"https://www.zonaprop.com.ar/departamentos-alquiler-capital-federal.html\"\n    }\n  ]\n}",
         "options": {
           "timeout": 300000
         }
       },
-      "id": "f696b001-48bb-4b7d-b46b-7e809f3c06d8",
+      "id": "166401c2-6b22-4a8a-8043-d41c302d57a0",
       "name": "Apify: Scraper Zonaprop (1000 items)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        208,
-        560
+        -928,
+        672
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -244,13 +246,13 @@
       "parameters": {
         "jsCode": "// @ts-nocheck\n// Circuit Breaker & Idempotence Check\nconst inputJson = $input.first().json;\nconst runData = inputJson['data'] || {};\nconst datasetId = runData['defaultDatasetId'];\nconst runStatus = runData['status'] || '';\n\n// En cuentas gratuitas de Apify chargedEventCounts puede venir en 0 porque no se cobra por item.\n// Verificamos que el scraper haya finalizado en SUCCEEDED y que exista el datasetId.\nconst charged = runData['chargedEventCounts'] || runData['accountedChargedEventCounts'] || {};\nconst chargedCount = Number(charged['apify-default-dataset-item'] || 0);\nconst isBatchValid = (runStatus === 'SUCCEEDED' && Boolean(datasetId));\n\nif (!isBatchValid) {\n  return [{\n    json: {\n      proceed: false,\n      reason: 'ERR_SCRAPER_INCOMPLETE_BATCH',\n      message: `Scraper finalizó con estado '${runStatus}' sin dataset válido. Abortando para proteger datos.`\n    }\n  }];\n}\n\n// Idempotencia contra $getWorkflowStaticData()\nconst staticData = $getWorkflowStaticData('global');\nconst prevDatasetId = staticData.lastDatasetId;\n\nif (prevDatasetId && prevDatasetId === datasetId) {\n  return [{\n    json: {\n      proceed: false,\n      reason: 'SKIP_IDENTICAL_DATASET',\n      message: 'Dataset idéntico al procesado previamente. Sin cambios.'\n    }\n  }];\n}\n\nstaticData.lastDatasetId = datasetId;\n\nreturn [{\n  json: {\n    proceed: true,\n    datasetId: datasetId,\n    itemCount: chargedCount > 0 ? chargedCount : 5\n  }\n}];"
       },
-      "id": "7cd23a3a-2f4d-4a4f-8078-dc795776b040",
+      "id": "c2d37dbe-4d21-46e6-b9e8-89ca123219e1",
       "name": "Circuit Breaker & Hash Check",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        432,
-        560
+        -704,
+        672
       ]
     },
     {
@@ -278,13 +280,13 @@
         },
         "options": {}
       },
-      "id": "829f66a2-f4b5-4dd0-a1c3-df360d436b48",
+      "id": "0dff2d8a-7240-412f-84da-0ee22381cf22",
       "name": "¿Proceder a Inferencia?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        640,
-        560
+        -496,
+        672
       ]
     },
     {
@@ -295,18 +297,18 @@
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"datasetId\": \"{{ $json.datasetId }}\",\n  \"limit\": 5,\n  \"modelStoreName\": \"mlops-production-models\"\n}",
+        "jsonBody": "={\n  \"datasetId\": \"{{ $json.datasetId }}\",\n  \"limit\": 1000,\n  \"modelStoreName\": \"mlops-production-models\"\n}",
         "options": {
           "timeout": 180000
         }
       },
-      "id": "21552ee3-a00c-4bfd-8f0d-ab0f1d930f83",
+      "id": "771143b8-ad87-4c02-a417-fecd1697cf6f",
       "name": "Apify: Actor Curado & Inferencia",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        864,
-        480
+        -272,
+        592
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -328,13 +330,13 @@
           }
         }
       },
-      "id": "39bd815b-cd96-4a89-a765-763b49b9f435",
+      "id": "ea9d8131-d8d2-44ea-9b43-b5f00f9f32a7",
       "name": "Descargar CSV Enriquecido",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1088,
-        480
+        -48,
+        592
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -360,13 +362,13 @@
         },
         "options": {}
       },
-      "id": "eb37418d-860c-4ed5-9712-89cd89eeb525",
+      "id": "93c65377-6fe1-4c1b-b708-01ed69456c88",
       "name": "Google Drive: Guardar CSV Mensual",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        1312,
-        480
+        176,
+        592
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
@@ -384,13 +386,13 @@
         "filter": {},
         "options": {}
       },
-      "id": "b5a6e2a2-d766-4c45-8c79-89aa4b4e5a24",
+      "id": "300ef1bd-0efc-4fa3-88e7-40b0c14900bf",
       "name": "Google Drive: Listar Archivos 01_mensual_enriquecido",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        1536,
-        480
+        400,
+        592
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
@@ -403,13 +405,13 @@
       "parameters": {
         "jsCode": "// @ts-nocheck\n// Retención Trimestral: Conservar únicamente datasets de los últimos 3 meses (o máximo 3 archivos)\nconst items = $input.all();\nif (!items || items.length === 0) {\n  return [];\n}\n\nconst KEEP_MONTHS = 3;\n\n// Helper: Extrae timestamp del nombre del archivo (YYYY_MM) o fallback a createdTime\nfunction getFileTimestamp(item) {\n  const name = item.json.name || '';\n  const match = name.match(/(\\d{4})_(\\d{2})/);\n  if (match) {\n    const year = parseInt(match[1], 10);\n    const month = parseInt(match[2], 10) - 1;\n    return new Date(Date.UTC(year, month, 1)).getTime();\n  }\n  return new Date(item.json.createdTime || item.json.modifiedTime || 0).getTime();\n}\n\n// Ordenar de más reciente a más antiguo\nitems.sort((a, b) => getFileTimestamp(b) - getFileTimestamp(a));\n\n// Umbral: primer día del mes hace 3 meses respecto a la fecha actual\nconst now = new Date();\nconst cutoffDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (KEEP_MONTHS - 1), 1)).getTime();\n\nconst toDelete = [];\nitems.forEach((item, index) => {\n  const fileTime = getFileTimestamp(item);\n  const isOlderThan3Months = fileTime < cutoffDate;\n  const isBeyondCount = index >= KEEP_MONTHS;\n\n  if (isOlderThan3Months || isBeyondCount) {\n    toDelete.push({\n      json: {\n        fileId: item.json.id,\n        name: item.json.name,\n        reason: isOlderThan3Months ? 'OLDER_THAN_3_MONTHS' : 'EXCEEDS_MAX_COUNT_3',\n        fileDate: new Date(fileTime).toISOString().slice(0, 7),\n        totalEvaluated: items.length\n      }\n    });\n  }\n});\n\nreturn toDelete;"
       },
-      "id": "9b3fc71a-4423-4029-a2a2-c4064e56f2d7",
+      "id": "f8ab46db-5cf2-46cd-bb06-cd40a22ac725",
       "name": "Retención: Filtrar Archivos > 3 Meses",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1760,
-        480
+        624,
+        592
       ]
     },
     {
@@ -422,13 +424,13 @@
         },
         "options": {}
       },
-      "id": "0054ec93-649f-4d0e-915c-a80cdc972589",
+      "id": "0a10b5b9-6db5-4804-ba08-fbd3a9af3b3a",
       "name": "Google Drive: Purgar Excedente a Papelera",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        1984,
-        480
+        848,
+        592
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
@@ -441,13 +443,13 @@
       "parameters": {
         "jsCode": "console.log('Ejecución omitida por Circuit Breaker:', $json.reason, $json.message);\nreturn [{ json: { status: 'SKIPPED', details: $json } }];"
       },
-      "id": "f1032bb4-c9b3-4ff0-8a23-c94567b5c93d",
+      "id": "fff56998-cf6e-44d0-9ba8-abc4de61d6f6",
       "name": "Log: Abortado por Circuit Breaker",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        864,
-        688
+        -272,
+        800
       ]
     },
     {
@@ -461,18 +463,19 @@
         },
         "folderId": {
           "__rl": true,
-          "value": "04_historico_alquileres_anual",
+          "value": "1GbuHWKIr5La-vCGeTuxvKYTctUM5xHG6",
           "mode": "list",
-          "cachedResultName": "04_historico_alquileres_anual"
+          "cachedResultName": "04_historico_alquileres_anual",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1GbuHWKIr5La-vCGeTuxvKYTctUM5xHG6"
         },
         "options": {}
       },
-      "id": "b9e4d120-7f1a-4c32-8a45-2d9f6e1c7b80",
+      "id": "73ab2bf1-d493-4acc-9107-2e26e65b9f3d",
       "name": "Google Drive: Acumular en Histórico Anual",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        1344,
+        176,
         416
       ],
       "credentials": {
@@ -485,20 +488,19 @@
     {
       "parameters": {
         "resource": "fileFolder",
-        "operation": "search",
         "searchMethod": "query",
         "queryString": "'10bpShYlE_FSzUtW3xNz5jH0BGbRGF4yo' in parents and trashed = false and mimeType = 'text/csv'",
         "returnAll": true,
         "filter": {},
         "options": {}
       },
-      "id": "11a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c",
+      "id": "fb19dd72-a329-43c3-973c-42bf181039e3",
       "name": "Google Drive: Listar CSVs de Entrenamiento",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        2016,
-        -96
+        880,
+        16
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
@@ -517,13 +519,13 @@
         },
         "options": {}
       },
-      "id": "22b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d",
+      "id": "700af7bc-3ce2-4fd1-a1bf-8551442acbe3",
       "name": "Google Drive: Descargar CSVs de Entrenamiento",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        2240,
-        -96
+        1104,
+        16
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
@@ -534,16 +536,15 @@
     },
     {
       "parameters": {
-        "mode": "runOnceForAllItems",
         "jsCode": "const items = $input.all();\nconst csvTexts = [];\nfor (let i = 0; i < items.length; i++) {\n  const buf = await this.helpers.getBinaryDataBuffer(i, \"data\");\n  if (buf && buf.length > 0) {\n    csvTexts.push(buf.toString(\"utf8\"));\n  }\n}\nif (csvTexts.length === 0) {\n  throw new Error(\"ERR_NO_TRAINING_CSV_IN_DRIVE: No se encontraron archivos CSV en Drive para entrenar.\");\n}\nreturn [{\n  json: {\n    minR2Threshold: 0.80,\n    minSamples: 500,\n    trainingDataCsvText: csvTexts\n  }\n}];"
       },
-      "id": "33c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e",
+      "id": "5c569732-2f86-4c6d-8024-5833e57f56d5",
       "name": "Preparar Payload de Entrenamiento",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2464,
-        -96
+        1328,
+        16
       ]
     },
     {
@@ -559,13 +560,13 @@
           "timeout": 360000
         }
       },
-      "id": "a7f2b910-4c6e-4f83-9c12-1e8b3d4a5f90",
+      "id": "fc1b04b2-0586-45d4-8b49-b62adea8634e",
       "name": "Apify: Actor Trainer",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2688,
-        -96
+        1552,
+        16
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -578,13 +579,13 @@
       "parameters": {
         "jsCode": "const runResp = $(\"Apify: Actor Trainer\").first().json || {};\nconst runData = runResp.data || runResp;\nconst status = runData.status || \"UNKNOWN\";\nconst kvStoreId = runData.defaultKeyValueStoreId;\nconst prodStoreResp = $(\"Apify: Abrir Store Producción\").first().json || {};\nconst prodStoreId = (prodStoreResp.data && prodStoreResp.data.id) || \"mlops-production-models\";\nif (status !== \"SUCCEEDED\" || !kvStoreId) {\n  throw new Error(`ERR_TRAINER_RUN_FAILED: status=${status}, kvStoreId=${kvStoreId}`);\n}\nconst files = [\n  \"kmeans_model.joblib\",\n  \"xgb_price_model.joblib\",\n  \"model_metadata.joblib\",\n  \"models_manifest.json\"\n];\nreturn files.map(fileName => ({\n  json: {\n    kvStoreId,\n    prodStoreId,\n    fileName,\n    downloadUrl: `https://api.apify.com/v2/key-value-stores/${kvStoreId}/records/${fileName}`\n  }\n}));"
       },
-      "id": "44d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f",
+      "id": "0958c80e-3581-4efb-a415-be5295966c48",
       "name": "Verificar Trainer & Listar Artefactos",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2912,
-        -96
+        1984,
+        16
       ]
     },
     {
@@ -593,21 +594,21 @@
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {
-          "timeout": 60000,
           "response": {
             "response": {
               "responseFormat": "file"
             }
-          }
+          },
+          "timeout": 60000
         }
       },
-      "id": "55e6f7a8-b9c0-4d1e-2f3a-4b5c6d7e8f9a",
+      "id": "b2c34d7f-fda0-42cc-9a50-81a07784f21d",
       "name": "Apify: Descargar Artefactos del Modelo",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3136,
-        -96
+        2208,
+        16
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -634,13 +635,13 @@
         },
         "options": {}
       },
-      "id": "66f7a8b9-c0d1-4e2f-3a4b-5c6d7e8f9a0b",
+      "id": "b9abe240-2c22-43f8-80db-d86d73023a3e",
       "name": "Google Drive: Guardar Modelo en 03_model_registry",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        3360,
-        -96
+        2432,
+        16
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
@@ -659,13 +660,13 @@
           "timeout": 30000
         }
       },
-      "id": "77a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c",
+      "id": "8e9a97a5-e243-48dc-add7-0ae22dd4f2eb",
       "name": "Apify: Abrir Store Producción",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2912,
-        -220
+        1776,
+        16
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -687,13 +688,13 @@
           "timeout": 60000
         }
       },
-      "id": "88b9c0d1-e2f3-4a4b-5c6d-7e8f9a0b1c2d",
+      "id": "12f7ddd3-fc4d-4d50-89db-823385c61311",
       "name": "Apify: Publicar Modelo en Producción",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3360,
-        48
+        2432,
+        160
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -1021,7 +1022,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "ab36e533-d2a8-4d0d-beb0-4113be1d5130",
+  "versionId": "073480d2-b6eb-462b-a163-24d6a476012f",
   "meta": {
     "instanceId": "7cb119a4df20522f99346f21768a196c316ffd8451efa7f007981688cc4db00e"
   },

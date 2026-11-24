@@ -77,9 +77,12 @@ def load_dataset_from_input(actor_input: dict[str, Any]) -> pd.DataFrame:
         raise ValueError("ERR_NO_DATA: No se encontró ningún dataset válido en el input ni en el entorno local.")
 
     # Deduplicación por clave natural si están disponibles las columnas
-    natural_keys = [c for c in ("calle_normalizada", "m2_cubiertos", "ambientes") if c in df.columns]
-    if natural_keys:
-        df = df.drop_duplicates(subset=natural_keys, keep="last").reset_index(drop=True)
+    if "listing_id" in df.columns and df["listing_id"].nunique() > 1:
+        df = df.drop_duplicates(subset=["listing_id"], keep="last").reset_index(drop=True)
+    elif all(c in df.columns for c in ("calle_normalizada", "m2_cubiertos", "ambientes")):
+        df = df.drop_duplicates(subset=["calle_normalizada", "m2_cubiertos", "ambientes"], keep="last").reset_index(drop=True)
+    elif all(c in df.columns for c in ("latitud", "longitud", "m2_totales", "ambientes")):
+        df = df.drop_duplicates(subset=["latitud", "longitud", "m2_totales", "ambientes"], keep="last").reset_index(drop=True)
 
     return df
 

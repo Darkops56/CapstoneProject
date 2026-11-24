@@ -24,9 +24,10 @@ El ecosistema desacopla estrictamente el ciclo mensual de inferencia del ciclo a
 ```
 
 ### Repositorio de Workflows (`workflows/n8n/`)
-- **`workflow_mensual_zonaprop_inferencia.json`**: Flujo mensual completo con extracción Zonaprop, scoring corporativo, persistencia en Google Drive, **purga automática de datasets de más de 3 meses** y acumulación inmutable en histórico anual.
-- **`workflow_anual_auditoria_gcba.json`**: Flujo anual de auditoría e ingesta de datos abiertos del GCBA (delitos, bocas de subte, ruido y escuelas) con reentrenamiento serverless y guardado en Drive.
-- **`Pipeline Completo Anual y Mensual.json`**: Integración de ambos ciclos en un único lienzo visual unificado (**31 nodos**).
+- **`workflow_mensual_zonaprop_inferencia.json`**: Flujo mensual modular con extracción Zonaprop, scoring corporativo, persistencia en Google Drive, purga automática (>3 meses) y acumulación en histórico anual.
+- **`workflow_anual_auditoria_gcba.json`**: Flujo anual modular de auditoría CKAN del GCBA con reentrenamiento serverless y guardado en Drive.
+- **`Pipeline Completo Anual y Mensual, Inferencia y Persistencia Drive.json`**: Lienzo unificado para **Producción** con scraping de 1.000 items y umbral estricto de reentrenamiento ($N \ge 500$, $R^2 \ge 0.80$).
+- **`Pipeline Completo Anual y Mensual (Test Reducido Free Tier).json`**: Lienzo unificado para **Validación y Pruebas Gratuitas (Free Tier)** con scraping acotado a 50 items (tope del scraper gratuito de Apify) y reentrenamiento permisivo ($N \ge 30$, $R^2 \ge 0.10$).
 
 > **Seguridad de Credenciales:** Los archivos JSON exportados solo contienen identificadores de referencia interna (`id`), garantizando que **ningún token de Apify ni credencial OAuth2 de Google Drive queda expuesto en el código**.
 
@@ -153,6 +154,23 @@ En tu unidad de [Google Drive](https://drive.google.com/), estructura las siguie
 | **CKAN API: Consultar Datasets GCBA** | Resiliencia | `Continue on Fail: true`, `timeout: 30000ms`. Si falla, emite `WARN_GCBA_UNAVAILABLE` y converge al reentrenamiento. |
 | **Apify: Actor Trainer** | URL & Timeout | `POST https://api.apify.com/v2/acts/TU_USUARIO~mlops-annual-trainer/runs?waitForFinish=360`, `timeout: 360000ms`, Auth: `Apify Header Auth` |
 | **Apify: Publicar Modelo en Producción** | KV Store | Publica binarios `.joblib` en el Store de Apify para habilitar carga dinámica sin reconstruir Docker. |
+
+---
+
+### Paso 5.4: Comparativa de Entornos — Producción vs. Test Reducido (Free Tier)
+
+Para evitar bloqueos por paywalls de terceros en Apify (donde el actor de Zonaprop restringe a 50 ítems a cuentas gratuitas) o fallas por falta de volumen en pruebas iniciales, el repositorio ofrece dos lienzos unificados listos para importar:
+
+| Parámetro / Nodo | Workflow de Producción (`...Drive.json`) | Workflow de Test Reducido (`...Test Reducido Free Tier).json`) | Justificación Técnica |
+|---|---|---|---|
+| **Archivo JSON** | `Pipeline Completo Anual y Mensual, Inferencia y Persistencia Drive.json` | `Pipeline Completo Anual y Mensual (Test Reducido Free Tier).json` | Desacoplamiento de entornos de ejecución en n8n. |
+| **Scraper Zonaprop (`maxItems`)** | `1000` | `50` | Respeta el límite gratuito forzado (`detail cap=50`) de `memo23~zonaprop-scraper`. |
+| **Timeout Scraper** | `300000ms` (300s) | `300000ms` (300s) | Tiempo suficiente para 50 registros sin sobrecosto de CU. |
+| **Umbral Muestral (`minSamples`)** | `500` | `30` | Previene `ERR_INSUFFICIENT_DATA` en el Trainer al correr con lotes del Free Tier. |
+| **Guarda Regresión (`minR2Threshold`)** | `0.80` | `0.10` | Previene `ERR_METRIC_REGRESSION` ante el ruido estadístico de muestras pequeñas de prueba. |
+| **Destino de Artefactos** | Google Drive + Apify KV Store | Google Drive + Apify KV Store | Idéntica observabilidad y entrega de modelos en ambos entornos. |
+
+> 💡 **Recomendación Operativa:** Para validar la integración completa de extremo a extremo sin costo y en menos de 3 minutos, importa el workflow **Test Reducido Free Tier**. Una vez validado y con una cuenta con proxies residenciales/suscripción, utiliza el workflow de **Producción**.
 
 ---
 

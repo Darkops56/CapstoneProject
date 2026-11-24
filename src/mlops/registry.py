@@ -84,10 +84,16 @@ def deduplicate_annual_dataset(
     key_cols: tuple[str, ...] = ("calle_normalizada", "m2_cubiertos", "ambientes"),
 ) -> Any:
     """Deduplica el acumulador anual por clave natural conservando la última observación."""
-    available_keys = [c for c in key_cols if c in df.columns]
-    if not available_keys:
-        return df.drop_duplicates(keep="last").reset_index(drop=True)
-    return df.drop_duplicates(subset=available_keys, keep="last").reset_index(drop=True)
+    if "listing_id" in df.columns and df["listing_id"].nunique() > 1:
+        return df.drop_duplicates(subset=["listing_id"], keep="last").reset_index(drop=True)
+    if all(c in df.columns for c in key_cols):
+        return df.drop_duplicates(subset=list(key_cols), keep="last").reset_index(drop=True)
+    if all(c in df.columns for c in ("latitud", "longitud", "m2_totales", "ambientes")):
+        return df.drop_duplicates(subset=["latitud", "longitud", "m2_totales", "ambientes"], keep="last").reset_index(drop=True)
+    available_keys = [c for c in key_cols if c in df.columns and c != "ambientes"]
+    if available_keys:
+        return df.drop_duplicates(subset=available_keys, keep="last").reset_index(drop=True)
+    return df.drop_duplicates(keep="last").reset_index(drop=True)
 
 
 def bump_version(

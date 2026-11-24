@@ -65,7 +65,7 @@ El repositorio sigue una arquitectura desacoplada bajo el estándar canónico `s
 │   └── observatorio_caba_showcase.ipynb # Showcase interactivo y analítico para defensa
 │
 ├── workflows/                     # ⚙️ Automatización y Orquestación Cloud
-│   └── n8n/                       # Flujos de orquestación mensual, anual y lienzo unificado
+│   └── n8n/                       # Flujos mensuales, anuales y lienzos unificados (Producción vs. Test Reducido)
 │
 ├── scripts/                       # 🛠️ Utilidades de Soporte y Preparación
 │   ├── fetch_apify_raw.py         # Descarga segura de datasets crudos vía APIFY_TOKEN
@@ -118,6 +118,21 @@ El sistema desacopla el ciclo mensual de scoring del ciclo anual de reentrenamie
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+### ⚡ Costo Computacional y Rendimiento de Inferencia (Apify Serverless)
+
+El Actor de Inferencia (`actors/inference/`) opera bajo un contenedor hermético dimensionado en **1.024 MB (1.0 GB RAM / 0.25 vCPU)**. Siguiendo la fórmula oficial de facturación de Apify ($\text{CU} = \text{RAM (GB)} \times \text{Horas}$ a \$0.20/CU), el costo de inferencia se mantiene por debajo de una fracción de centavo de dólar por corrida:
+
+| Métrica / Dimensión | Lote Estándar (1.000 reg.) | Lote Mensual CABA (10.000 reg.) | Escalabilidad |
+|---|---|---|---|
+| **Tiempo Neto de Cómputo** | **0.59 s** | **5.69 s** | Sublineal con BallTree |
+| **Tiempo Total Corrida (con I/O)** | **~2.59 s** | **~7.69 s** | SLA < 10.0s |
+| **Memoria RAM Pico Residente** | **528.8 MB** | **572.6 MB** | Headroom seguro (>450 MB) |
+| **Compute Units (CUs)** | **0.000720 CU** | **0.002135 CU** | Eficiencia serverless |
+| **Costo por Corrida (USD)** | **\$0.000144 USD** | **\$0.000427 USD** | Tarifa base \$0.20/CU |
+| **Costo Mensual (4 corridas)** | **\$0.000576 USD** | **\$0.001708 USD** | **100% Free Tier Apify** (\$5/mes crédito) |
+
+> 🔬 **Reproducibilidad:** Ejecuta el benchmark determinista con `python scripts/benchmark_inference_cost.py --records 1000,10000` o valida los SLAs con `pytest tests/test_inference_cost_benchmark.py`.
+
 ---
 
 ## 🌐 Despliegue en Streamlit Community Cloud
@@ -166,16 +181,25 @@ Accede a `http://localhost:8501`.
 python src/mlops/train_models.py --registry --bump --min-r2 0.80
 ```
 
-### 3. Ejecución de Pruebas Automatizadas
-El proyecto cuenta con un arnés de pruebas deterministas de **70 tests**:
+### 3. Benchmark de Costo Computacional y Recursos (Apify)
 ```bash
-# Ejecutar la suite completa (Backend + UI)
+# Ejecutar medición determinista de latencia, memoria y costo para 1k y 10k registros
+python scripts/benchmark_inference_cost.py --records 1000,10000
+```
+
+### 4. Ejecución de Pruebas Automatizadas
+El proyecto cuenta con un arnés de pruebas deterministas de **74 tests**:
+```bash
+# Ejecutar la suite completa (Backend + UI + Benchmarks)
 pytest
+
+# Ejecutar pruebas del benchmark de costo computacional
+pytest tests/test_inference_cost_benchmark.py -v
 
 # Ejecutar únicamente pruebas de la UI de Streamlit (19 tests)
 pytest dashboard/tests/ -v
 
-# Ejecutar únicamente pruebas de Backend, MLOps y Actores (51 tests)
+# Ejecutar únicamente pruebas de Backend, MLOps y Actores (55 tests)
 pytest tests/ -v
 ```
 

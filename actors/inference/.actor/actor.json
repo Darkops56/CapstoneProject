@@ -5,5 +5,11 @@
   "description": "Actor unificado para limpieza tabular, cruce geoespacial con datos GCBA e inferencia con XGBoost y K-Means para scoring de decisión corporativa.",
   "version": "1.0",
   "dockerfile": "../Dockerfile",
-  "actorPermissionLevel": "FULL_PERMISSIONS"
+  "readme": "../README.md",
+  "input": "./input_schema.json",
+  "output": "./output_schema.json",
+  "storages": {
+    "dataset": "./dataset_schema.json"
+  },
+  "actorPermissionLevel": "LIMITED_PERMISSIONS"
 }

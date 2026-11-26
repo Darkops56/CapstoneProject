@@ -1,0 +1,63 @@
+{
+  "actorSpecification": 1,
+  "title": "Dataset de Resumen de Entrenamiento MLOps",
+  "description": "Resumen estructurado de la corrida anual de reentrenamiento K-Means y XGBoost, artefactos publicados en KV Store y exportación a Google Drive.",
+  "fields": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "type": "string",
+        "title": "Estado",
+        "description": "Estado final de la corrida ('success' o 'error')."
+      },
+      "kv_artifacts": {
+        "type": "array",
+        "title": "Artefactos en KV Store",
+        "description": "Listado de archivos publicados en el Key-Value Store de la corrida.",
+        "items": {
+          "type": "string"
+        }
+      },
+      "manifest": {
+        "type": "object",
+        "title": "Manifiesto de Producción",
+        "description": "Contenido de models_manifest.json generado en la corrida."
+      },
+      "training_results": {
+        "type": "object",
+        "title": "Resultados de Entrenamiento",
+        "description": "Reportes detallados de K-Means (optimal_k, silhouette_score), XGBoost (r2, rmse, mae) y rutas locales de artefactos."
+      },
+      "drive_export": {
+        "type": "object",
+        "title": "Exportación a Google Drive",
+        "description": "Resultado de la exportación atómica a 03_model_registry (o objeto vacío si no se proveyó Service Account)."
+      }
+    }
+  },
+  "views": {
+    "overview": {
+      "title": "Resumen de Corrida Trainer",
+      "description": "Vista general del estado, artefactos en KV Store, manifiesto y exportación a Google Drive.",
+      "transformation": {
+        "fields": [
+          "status",
+          "kv_artifacts",
+          "manifest",
+          "training_results",
+          "drive_export"
+        ]
+      },
+      "display": {
+        "component": "table",
+        "properties": {
+          "status": { "label": "Estado", "format": "text" },
+          "kv_artifacts": { "label": "Artefactos KV", "format": "array" },
+          "manifest": { "label": "Manifiesto", "format": "object" },
+          "training_results": { "label": "Resultados ML", "format": "object" },
+          "drive_export": { "label": "Export Drive", "format": "object" }
+        }
+      }
+    }
+  }
+}

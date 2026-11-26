@@ -286,7 +286,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const runResp = $(\"Apify: Actor Trainer\").first().json || {};\nconst runData = runResp.data || runResp;\nconst status = runData.status || \"UNKNOWN\";\nconst kvStoreId = runData.defaultKeyValueStoreId;\nconst prodStoreResp = $(\"Apify: Abrir Store Producción\").first().json || {};\nconst prodStoreId = (prodStoreResp.data && prodStoreResp.data.id) || \"mlops-production-models\";\nif (status !== \"SUCCEEDED\" || !kvStoreId) {\n  throw new Error(`ERR_TRAINER_RUN_FAILED: status=${status}, kvStoreId=${kvStoreId}`);\n}\nconst files = [\n  \"kmeans_model.joblib\",\n  \"xgb_price_model.joblib\",\n  \"model_metadata.joblib\",\n  \"models_manifest.json\"\n];\nreturn files.map(fileName => ({\n  json: {\n    kvStoreId,\n    prodStoreId,\n    fileName,\n    downloadUrl: `https://api.apify.com/v2/key-value-stores/${kvStoreId}/records/${fileName}`\n  }\n}));"
+        "jsCode": "const trainerNode = $(\"Apify: Consultar Estado Trainer\");\nconst runResp = (trainerNode && trainerNode.first() ? trainerNode.first().json : null) || $(\"Apify: Actor Trainer\").first().json || {};\nconst runData = runResp.data || runResp;\nconst status = runData.status || \"UNKNOWN\";\nconst kvStoreId = runData.defaultKeyValueStoreId;\nconst prodStoreResp = $(\"Apify: Abrir Store Producción\").first().json || {};\nconst prodStoreId = (prodStoreResp.data && prodStoreResp.data.id) || \"mlops-production-models\";\nif (status !== \"SUCCEEDED\" || !kvStoreId) {\n  throw new Error(`ERR_TRAINER_RUN_FAILED: status=${status}, kvStoreId=${kvStoreId}`);\n}\nconst files = [\n  \"kmeans_model.joblib\",\n  \"xgb_price_model.joblib\",\n  \"model_metadata.joblib\",\n  \"models_manifest.json\"\n];\nreturn files.map(fileName => ({\n  json: {\n    kvStoreId,\n    prodStoreId,\n    fileName,\n    downloadUrl: `https://api.apify.com/v2/key-value-stores/${kvStoreId}/records/${fileName}`\n  }\n}));"
       },
       "id": "44d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f",
       "name": "Verificar Trainer & Listar Artefactos",
@@ -404,6 +404,44 @@
       "position": [
         3360,
         48
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "vnUeNbHvvtxDiCq1",
+          "name": "Apify Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 75,
+        "unit": "seconds"
+      },
+      "id": "b2efd95f-1981-4163-b129-3154a241b620",
+      "name": "Wait: Esperar Entrenamiento",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3062,
+        -220
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.apify.com/v2/actor-runs/{{ $(\"Apify: Actor Trainer\").first().json.data.id }}?waitForFinish=60",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "bca7bb39-3888-456b-91d2-52a36868b90c",
+      "name": "Apify: Consultar Estado Trainer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3262,
+        -220
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -603,6 +641,28 @@
       ]
     },
     "Apify: Abrir Store Producción": {
+      "main": [
+        [
+          {
+            "node": "Wait: Esperar Entrenamiento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait: Esperar Entrenamiento": {
+      "main": [
+        [
+          {
+            "node": "Apify: Consultar Estado Trainer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify: Consultar Estado Trainer": {
       "main": [
         [
           {

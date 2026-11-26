@@ -1,0 +1,61 @@
+{
+  "actorKeyValueStoreSchemaVersion": 1,
+  "title": "Artefactos de Modelos y Manifiestos (MLOps Trainer)",
+  "description": "Claves publicadas en el Key-Value Store por defecto durante el reentrenamiento anual de modelos CABA.",
+  "collections": {
+    "output": {
+      "title": "OUTPUT",
+      "description": "Resumen completo de la corrida (éxito con métricas y exportaciones, o detalle de error).",
+      "key": "OUTPUT",
+      "contentTypes": ["application/json"],
+      "jsonSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "kv_artifacts": { "type": "array", "items": { "type": "string" } },
+          "manifest": { "type": "object" },
+          "training_results": { "type": "object" },
+          "drive_export": { "type": "object" },
+          "error": { "type": "string" }
+        },
+        "required": ["status"]
+      }
+    },
+    "manifest": {
+      "title": "Manifiesto de Modelos",
+      "description": "Metadatos del paquete entrenado listo para promoción en KV Store de producción.",
+      "key": "models_manifest.json",
+      "contentTypes": ["application/json"],
+      "jsonSchema": {
+        "type": "object",
+        "properties": {
+          "generated_at": { "type": "string" },
+          "sample_count": { "type": "integer" },
+          "dataset_hash": { "type": "string" },
+          "metrics": { "type": "object" },
+          "artifacts": { "type": "array", "items": { "type": "string" } },
+          "status": { "type": "string" }
+        },
+        "required": ["generated_at", "sample_count", "metrics", "artifacts", "status"]
+      }
+    },
+    "kmeansModel": {
+      "title": "Modelo K-Means Serializado",
+      "description": "Pipeline StandardScaler + KMeans en formato binario joblib.",
+      "key": "kmeans_model.joblib",
+      "contentTypes": ["application/octet-stream"]
+    },
+    "xgbPriceModel": {
+      "title": "Modelo XGBoost Serializado",
+      "description": "TransformedTargetRegressor con XGBRegressor en formato binario joblib.",
+      "key": "xgb_price_model.joblib",
+      "contentTypes": ["application/octet-stream"]
+    },
+    "modelMetadata": {
+      "title": "Metadatos de Modelo Serializados",
+      "description": "Diccionario con features de regresión, features de clustering, cluster_labels y métricas en formato joblib.",
+      "key": "model_metadata.joblib",
+      "contentTypes": ["application/octet-stream"]
+    }
+  }
+}

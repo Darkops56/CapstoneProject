@@ -577,7 +577,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const runResp = $(\"Apify: Actor Trainer\").first().json || {};\nconst runData = runResp.data || runResp;\nconst status = runData.status || \"UNKNOWN\";\nconst kvStoreId = runData.defaultKeyValueStoreId;\nconst prodStoreResp = $(\"Apify: Abrir Store Producción\").first().json || {};\nconst prodStoreId = (prodStoreResp.data && prodStoreResp.data.id) || \"mlops-production-models\";\nif (status !== \"SUCCEEDED\" || !kvStoreId) {\n  throw new Error(`ERR_TRAINER_RUN_FAILED: status=${status}, kvStoreId=${kvStoreId}`);\n}\nconst files = [\n  \"kmeans_model.joblib\",\n  \"xgb_price_model.joblib\",\n  \"model_metadata.joblib\",\n  \"models_manifest.json\"\n];\nreturn files.map(fileName => ({\n  json: {\n    kvStoreId,\n    prodStoreId,\n    fileName,\n    downloadUrl: `https://api.apify.com/v2/key-value-stores/${kvStoreId}/records/${fileName}`\n  }\n}));"
+        "jsCode": "const trainerNode = $(\"Apify: Consultar Estado Trainer\");\nconst runResp = (trainerNode && trainerNode.first() ? trainerNode.first().json : null) || $(\"Apify: Actor Trainer\").first().json || {};\nconst runData = runResp.data || runResp;\nconst status = runData.status || \"UNKNOWN\";\nconst kvStoreId = runData.defaultKeyValueStoreId;\nconst prodStoreResp = $(\"Apify: Abrir Store Producción\").first().json || {};\nconst prodStoreId = (prodStoreResp.data && prodStoreResp.data.id) || \"mlops-production-models\";\nif (status !== \"SUCCEEDED\" || !kvStoreId) {\n  throw new Error(`ERR_TRAINER_RUN_FAILED: status=${status}, kvStoreId=${kvStoreId}`);\n}\nconst files = [\n  \"kmeans_model.joblib\",\n  \"xgb_price_model.joblib\",\n  \"model_metadata.joblib\",\n  \"models_manifest.json\"\n];\nreturn files.map(fileName => ({\n  json: {\n    kvStoreId,\n    prodStoreId,\n    fileName,\n    downloadUrl: `https://api.apify.com/v2/key-value-stores/${kvStoreId}/records/${fileName}`\n  }\n}));"
       },
       "id": "0958c80e-3581-4efb-a415-be5295966c48",
       "name": "Verificar Trainer & Listar Artefactos",
@@ -695,6 +695,44 @@
       "position": [
         2432,
         160
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "vnUeNbHvvtxDiCq1",
+          "name": "Apify Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 75,
+        "unit": "seconds"
+      },
+      "id": "c8b41a85-0f55-4826-b16b-2ef24f1aa1d9",
+      "name": "Wait: Esperar Entrenamiento",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1926,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.apify.com/v2/actor-runs/{{ $(\"Apify: Actor Trainer\").first().json.data.id }}?waitForFinish=60",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "28fe6feb-7a27-49c7-a2b9-0cac720110a4",
+      "name": "Apify: Consultar Estado Trainer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2126,
+        16
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -998,7 +1036,7 @@
       "main": [
         [
           {
-            "node": "Verificar Trainer & Listar Artefactos",
+            "node": "Wait: Esperar Entrenamiento",
             "type": "main",
             "index": 0
           }
@@ -1010,6 +1048,28 @@
         [
           {
             "node": "Circuit Breaker & Hash Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait: Esperar Entrenamiento": {
+      "main": [
+        [
+          {
+            "node": "Apify: Consultar Estado Trainer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify: Consultar Estado Trainer": {
+      "main": [
+        [
+          {
+            "node": "Verificar Trainer & Listar Artefactos",
             "type": "main",
             "index": 0
           }

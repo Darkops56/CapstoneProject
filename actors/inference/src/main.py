@@ -44,9 +44,9 @@ def run_pipeline(
 
 async def _resolve_dynamic_models(actor_input: dict[str, Any]) -> Path | None:
     """Descarga modelos actualizados desde un Key-Value Store de Apify si se indica en el input."""
-    store_name = actor_input.get("modelStoreName")
     store_id = actor_input.get("modelKvStoreId")
-    if not store_name and not store_id:
+    store_name = actor_input.get("modelStoreName")
+    if not store_id and not store_name:
         return None
 
     required_files = ("kmeans_model.joblib", "xgb_price_model.joblib", "model_metadata.joblib")
@@ -54,17 +54,18 @@ async def _resolve_dynamic_models(actor_input: dict[str, Any]) -> Path | None:
     target_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        kv_store = await Actor.open_key_value_store(name=store_name) if store_name else await Actor.open_key_value_store(id=store_id)
+        # Bajo LIMITED_PERMISSIONS se prioriza store_id que cuenta con resourcePermissions delegados
+        kv_store = await Actor.open_key_value_store(id=store_id) if store_id else await Actor.open_key_value_store(name=store_name)
         for fname in required_files:
             content = await kv_store.get_value(fname)
             if not content or not isinstance(content, (bytes, bytearray)):
-                print(f"[Actor] WARN: Falta '{fname}' en KV Store ({store_name or store_id}); usando fallback local.")
+                print(f"[Actor] WARN: Falta '{fname}' en KV Store ({store_id or store_name}); usando fallback local.")
                 return None
             (target_dir / fname).write_bytes(bytes(content))
-        print(f"[Actor] Modelos dinámicos cargados desde Apify KV Store: {store_name or store_id}")
+        print(f"[Actor] Modelos dinámicos cargados desde Apify KV Store: {store_id or store_name}")
         return target_dir
     except Exception as exc:
-        print(f"[Actor] WARN: Error leyendo KV Store ({store_name or store_id}): {exc}. Usando fallback local.")
+        print(f"[Actor] WARN: Error leyendo KV Store ({store_id or store_name}): {exc}. Usando fallback local.")
         return None
 
 
@@ -82,10 +83,17 @@ async def _run_apify_mode() -> None:
         # Si se proveyó un datasetId de Zonaprop, descargar los items
         if dataset_id and not raw_items:
             print(f"[Actor] Descargando items desde datasetId: {dataset_id}...")
-            client = Actor.new_client()
-            dataset_client = client.dataset(dataset_id)
-            dataset_items = await dataset_client.list_items(limit=limit)
-            raw_items = dataset_items.items
+            try:
+                # Patrón idiomático de Apify SDK para LIMITED_PERMISSIONS con resourcePermissions: ["READ"]
+                dataset = await Actor.open_dataset(id=dataset_id)
+                dataset_items = await dataset.get_data(limit=limit)
+                raw_items = dataset_items.items
+            except Exception as exc_open:
+                print(f"[Actor] INFO: Fallback a client.dataset tras open_dataset: {exc_open}")
+                client = Actor.new_client()
+                dataset_client = client.dataset(dataset_id)
+                dataset_items = await dataset_client.list_items(limit=limit)
+                raw_items = dataset_items.items
 
         if not raw_items:
             print("[Actor] WARN: No se recibieron datos de entrada en el Actor.")

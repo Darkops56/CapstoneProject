@@ -48,3 +48,4 @@ Para evitar pagar sobreprecios o elegir zonas con mala calidad ambiental, la sol
 - [02_EDA_ESTADISTICO_Y_SELECCION_FEATURES.md](./02_EDA_ESTADISTICO_Y_SELECCION_FEATURES.md) — Estadística, pruebas de hipótesis, VIF y justificación de las 10 features.
 - [03_MODELADO_KMEANS_XGBOOST_Y_SHAP.md](./03_MODELADO_KMEANS_XGBOOST_Y_SHAP.md) — K-Means, XGBoost Regressor, SHAP y gobernanza del Model Registry.
 - [04_SCORE_DECISION_INFERENCIA_Y_HANDOFF.md](./04_SCORE_DECISION_INFERENCIA_Y_HANDOFF.md) — Fórmula del Score `0–100`, arquitectura de handoff productivo y testing continuo.
+- [05_APIFY_ACTORS.md](./05_APIFY_ACTORS.md) — Contratos de Actores Apify (`actors/inference`, `actors/trainer`), `output_schema.json`, `dataset_schema.json`, `key_value_store_schema.json` y requisitos de publicación en Apify Store.

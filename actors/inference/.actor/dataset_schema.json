@@ -1,0 +1,201 @@
+{
+  "actorSpecification": 1,
+  "title": "Dataset de Propiedades Curadas y Evaluadas (CABA)",
+  "description": "Registros inmobiliarios de alquiler en CABA curados, enriquecidos geoespacialmente con datos abiertos del GCBA y evaluados con K-Means, XGBoost y Scoring de Relocalización Corporativa.",
+  "fields": {
+    "type": "object",
+    "properties": {
+      "listing_id": {
+        "type": "string",
+        "title": "Listing ID",
+        "description": "Identificador único de la publicación en Zonaprop."
+      },
+      "latitud": {
+        "type": "number",
+        "title": "Latitud",
+        "description": "Latitud WGS84 validada dentro del bounding box de CABA (o centroide imputado)."
+      },
+      "longitud": {
+        "type": "number",
+        "title": "Longitud",
+        "description": "Longitud WGS84 validada dentro del bounding box de CABA (o centroide imputado)."
+      },
+      "barrio": {
+        "type": "string",
+        "title": "Barrio",
+        "description": "Macro-barrio oficial normalizado en CABA."
+      },
+      "subzona": {
+        "type": "string",
+        "title": "Subzona",
+        "description": "Subzona o microbarrio reportado en la publicación."
+      },
+      "moneda_origen": {
+        "type": "string",
+        "title": "Moneda Origen",
+        "description": "Moneda original publicada (ARS o USD)."
+      },
+      "alquiler_ars": {
+        "type": "number",
+        "title": "Alquiler (ARS)",
+        "description": "Monto mensual de alquiler unificado a Pesos Argentinos (ARS)."
+      },
+      "expensas_ars": {
+        "type": "number",
+        "title": "Expensas (ARS)",
+        "description": "Expensas mensuales extraídas o imputadas en Pesos Argentinos (ARS)."
+      },
+      "costo_total_ars": {
+        "type": "number",
+        "title": "Costo Total (ARS)",
+        "description": "Costo mensual total publicado (alquiler_ars + expensas_ars)."
+      },
+      "apto_mascotas": {
+        "type": "number",
+        "title": "Apto Mascotas",
+        "description": "Indicador binario (1.0 = admite mascotas, 0.0 = no admite o no especificado) con detección de negaciones NLP."
+      },
+      "score_amenities": {
+        "type": "number",
+        "title": "Score Amenities",
+        "description": "Puntaje ponderado (0.0 a 10.0) según presencia de seguridad, cochera, pileta, gimnasio, parrilla, SUM y balcón."
+      },
+      "m2_totales": {
+        "type": "number",
+        "title": "Superficie Total (m2)",
+        "description": "Metros cuadrados totales extraídos de mainFeatures."
+      },
+      "banos": {
+        "type": "number",
+        "title": "Baños",
+        "description": "Cantidad de baños."
+      },
+      "ambientes": {
+        "type": "number",
+        "title": "Ambientes",
+        "description": "Cantidad de ambientes."
+      },
+      "cocheras": {
+        "type": "number",
+        "title": "Cocheras",
+        "description": "Cantidad de cocheras."
+      },
+      "tag_auditoria": {
+        "type": "string",
+        "title": "Tag Auditoría",
+        "description": "Bandera de trazabilidad de calidad de datos (VALID o AUDIT_COORD_IMPUTED / AUDIT_COORD_OUTSIDE_CABA / AUDIT_PRICE_IMPUTED)."
+      },
+      "ruido_db_promedio": {
+        "type": "number",
+        "title": "Ruido Diurno (dBA)",
+        "description": "Nivel promedio de ruido diurno en decibeles ponderados A según mapa oficial del GCBA."
+      },
+      "densidad_delitos_500m": {
+        "type": "number",
+        "title": "Delitos (500m)",
+        "description": "Cantidad de delitos registrados en un radio de 500 metros."
+      },
+      "indice_gravedad_delitos_500m": {
+        "type": "number",
+        "title": "Índice Gravedad Delitos (500m)",
+        "description": "Índice ponderado por gravedad de delitos en un radio de 500 metros."
+      },
+      "distancia_escuela_m": {
+        "type": "number",
+        "title": "Distancia Escuela (m)",
+        "description": "Distancia geodésica en metros al establecimiento educativo más cercano."
+      },
+      "lineas_subte_600m": {
+        "type": "number",
+        "title": "Líneas Subte (600m)",
+        "description": "Cantidad de líneas distintas de subterráneo en un radio de 600 metros."
+      },
+      "cluster_habitabilidad": {
+        "type": "integer",
+        "title": "Cluster ID",
+        "description": "Identificador numérico del clúster de habitabilidad asignado por K-Means."
+      },
+      "cluster_label": {
+        "type": "string",
+        "title": "Perfil de Entorno",
+        "description": "Etiqueta interpretable del clúster de habitabilidad (ej. Zona Familiar Tranquila, Hub Ejecutivo Conectado)."
+      },
+      "precio_justo_ars": {
+        "type": "number",
+        "title": "Precio Justo (ARS)",
+        "description": "Costo total mensual justo estimado por el modelo XGBoost Regressor."
+      },
+      "desvio_precio_pct": {
+        "type": "number",
+        "title": "Desvío Precio (%)",
+        "description": "Porcentaje de sobreprecio (+) o subvaluación (-) respecto al precio justo."
+      },
+      "pct_ahorro": {
+        "type": "number",
+        "title": "Ahorro (%)",
+        "description": "Porcentaje de ahorro relativo frente al precio justo (-desvio_precio_pct)."
+      },
+      "score_familia": {
+        "type": "number",
+        "title": "Score Familia (0-100)",
+        "description": "Puntaje de decisión corporativa (0 a 100) para el perfil FAMILIA."
+      },
+      "score_soltero": {
+        "type": "number",
+        "title": "Score Ejecutivo (0-100)",
+        "description": "Puntaje de decisión corporativa (0 a 100) para el perfil SOLTERO_EJECUTIVO."
+      },
+      "calificacion_familia": {
+        "type": "string",
+        "title": "Recomendación Familia",
+        "description": "Clasificación accionable para perfil FAMILIA (ALTAMENTE RECOMENDADA, RECOMENDADA, EVALUAR / ALTERNATIVA, DESCARTAR / SOBREPRECIO ALTO)."
+      },
+      "calificacion_soltero": {
+        "type": "string",
+        "title": "Recomendación Ejecutivo",
+        "description": "Clasificación accionable para perfil SOLTERO_EJECUTIVO."
+      }
+    }
+  },
+  "views": {
+    "overview": {
+      "title": "Resumen de Evaluación Inmobiliaria",
+      "description": "Vista principal con barrio, costos, precio justo estimado, perfil urbano y recomendaciones por perfil.",
+      "transformation": {
+        "fields": [
+          "listing_id",
+          "barrio",
+          "ambientes",
+          "m2_totales",
+          "costo_total_ars",
+          "precio_justo_ars",
+          "desvio_precio_pct",
+          "cluster_label",
+          "score_familia",
+          "calificacion_familia",
+          "score_soltero",
+          "calificacion_soltero",
+          "tag_auditoria"
+        ]
+      },
+      "display": {
+        "component": "table",
+        "properties": {
+          "listing_id": { "label": "ID", "format": "text" },
+          "barrio": { "label": "Barrio", "format": "text" },
+          "ambientes": { "label": "Amb.", "format": "number" },
+          "m2_totales": { "label": "m2", "format": "number" },
+          "costo_total_ars": { "label": "Costo Total (ARS)", "format": "number" },
+          "precio_justo_ars": { "label": "Precio Justo (ARS)", "format": "number" },
+          "desvio_precio_pct": { "label": "Desvío %", "format": "number" },
+          "cluster_label": { "label": "Entorno", "format": "text" },
+          "score_familia": { "label": "Score Familia", "format": "number" },
+          "calificacion_familia": { "label": "Calif. Familia", "format": "text" },
+          "score_soltero": { "label": "Score Ejecutivo", "format": "number" },
+          "calificacion_soltero": { "label": "Calif. Ejecutivo", "format": "text" },
+          "tag_auditoria": { "label": "Auditoría", "format": "text" }
+        }
+      }
+    }
+  }
+}

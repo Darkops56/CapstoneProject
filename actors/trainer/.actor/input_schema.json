@@ -6,39 +6,58 @@
     "gdriveFolderId": {
       "title": "ID Carpeta 03_model_registry en Google Drive",
       "type": "string",
-      "description": "ID de la carpeta en Google Drive donde se alojará el versionador de modelos (03_model_registry)",
+      "description": "ID de la carpeta en Google Drive donde se alojará el versionador de modelos (03_model_registry).",
       "editor": "textfield"
     },
     "minR2Threshold": {
       "title": "Umbral mínimo de R2",
       "type": "number",
-      "description": "Coeficiente R2 mínimo requerido para aceptar el nuevo modelo y no abortar por regresión (default: 0.80)",
+      "description": "Coeficiente R2 mínimo requerido para aceptar el nuevo modelo y no abortar por regresión (default: 0.80).",
       "default": 0.80,
       "editor": "number"
     },
     "minSamples": {
       "title": "Mínimo de registros para entrenar",
       "type": "integer",
-      "description": "Cantidad mínima de observaciones requeridas para disparar el reentrenamiento anual (default: 500)",
+      "description": "Cantidad mínima de observaciones requeridas para disparar el reentrenamiento anual (default: 500).",
       "default": 500,
       "editor": "number"
     },
     "trainingData": {
       "title": "Registros de entrenamiento (JSON Array)",
       "type": "array",
-      "description": "Lista de registros curados y enriquecidos para entrenar los modelos (alternativa directa)",
+      "description": "Lista de registros curados y enriquecidos para entrenar los modelos (alternativa directa).",
+      "editor": "json"
+    },
+    "trainingDataCsvText": {
+      "title": "CSV(s) de entrenamiento en texto",
+      "type": ["string", "array"],
+      "description": "Contenido CSV en texto plano o lista de strings CSV enviados desde n8n/Google Drive.",
       "editor": "json"
     },
     "trainingDataCsvUrl": {
       "title": "URL del CSV de entrenamiento",
       "type": "string",
-      "description": "URL de descarga directa o enlace público de Google Drive al CSV curado de entrenamiento",
+      "description": "URL de descarga directa o enlace público de Google Drive al CSV curado de entrenamiento.",
+      "editor": "textfield"
+    },
+    "dataPath": {
+      "title": "Ruta local al CSV de entrenamiento",
+      "type": "string",
+      "description": "Ruta local opcional dentro del contenedor para leer un CSV de entrenamiento.",
+      "editor": "textfield"
+    },
+    "targetCol": {
+      "title": "Columna objetivo (Target)",
+      "type": "string",
+      "description": "Nombre de la columna objetivo a predecir en regresión (default: costo_total_ars).",
+      "default": "costo_total_ars",
       "editor": "textfield"
     },
     "gdriveServiceAccountJson": {
       "title": "Credenciales de Google Service Account",
       "type": "string",
-      "description": "Contenido JSON de las credenciales de Service Account para autenticación con Google Drive",
+      "description": "Contenido JSON de las credenciales de Service Account para autenticación con Google Drive.",
       "editor": "textarea",
       "isSecret": true
     }

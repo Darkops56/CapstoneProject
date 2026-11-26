@@ -1,0 +1,43 @@
+{
+  "actorOutputSchemaVersion": 1,
+  "title": "Artefactos y Reporte de Reentrenamiento MLOps",
+  "description": "Enlaces al resumen de ejecución, manifiesto versionado y modelos serializados (.joblib) publicados en el Key-Value Store y Dataset del Actor Trainer.",
+  "properties": {
+    "trainingSummary": {
+      "type": "string",
+      "title": "Resumen de Ejecución (OUTPUT JSON)",
+      "description": "Objeto JSON con estado final, métricas (R2, RMSE, MAE, Silhouette), hash SHA-256 del dataset y resultado de exportación a Drive.",
+      "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/OUTPUT"
+    },
+    "modelsManifest": {
+      "type": "string",
+      "title": "Manifiesto de Modelos (models_manifest.json)",
+      "description": "Metadatos de producción con timestamp UTC, cantidad de muestras, dataset_hash, métricas y lista de binarios generados.",
+      "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/models_manifest.json"
+    },
+    "kmeansModel": {
+      "type": "string",
+      "title": "Modelo K-Means (.joblib)",
+      "description": "Pipeline serializado StandardScaler + KMeans para segmentación de habitabilidad CABA.",
+      "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/kmeans_model.joblib"
+    },
+    "xgbPriceModel": {
+      "type": "string",
+      "title": "Modelo XGBoost (.joblib)",
+      "description": "Modelo TransformedTargetRegressor (log1p/expm1) + XGBRegressor para estimación de precio justo mensual.",
+      "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/xgb_price_model.joblib"
+    },
+    "modelMetadata": {
+      "type": "string",
+      "title": "Metadatos de Features (.joblib)",
+      "description": "Diccionario serializado con regression_features, cluster_features, cluster_labels y métricas de validación.",
+      "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/model_metadata.joblib"
+    },
+    "datasetSummary": {
+      "type": "string",
+      "title": "Registro en Default Dataset (JSON)",
+      "description": "Ítem estructurado del Dataset por defecto con el resumen completo de la corrida.",
+      "template": "{{links.apiDefaultDatasetUrl}}/items"
+    }
+  }
+}

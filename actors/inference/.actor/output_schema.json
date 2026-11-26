@@ -1,0 +1,19 @@
+{
+  "actorOutputSchemaVersion": 1,
+  "title": "Resultados de Inferencia y Scoring CABA",
+  "description": "Enlaces al dataset enriquecido con las 30 variables curadas, precio justo estimado por XGBoost, cluster de habitabilidad K-Means y scores de decisión corporativa.",
+  "properties": {
+    "results": {
+      "type": "string",
+      "title": "Publicaciones Curadas y Evaluadas (JSON)",
+      "description": "Ítems completos del dataset por defecto con las 10 features curadas, precio justo, desvío porcentual, cluster y scores (0-100).",
+      "template": "{{links.apiDefaultDatasetUrl}}/items"
+    },
+    "resultsCsv": {
+      "type": "string",
+      "title": "Exportación Tabular Limpia (CSV)",
+      "description": "Descarga directa en formato CSV limpio para consumo en n8n, Google Drive o Streamlit.",
+      "template": "{{links.apiDefaultDatasetUrl}}/items?format=csv&clean=true"
+    }
+  }
+}
